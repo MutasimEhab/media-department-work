@@ -1,0 +1,256 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Advertising ExtraBold';
+  src: url('./assets/brand/fonts/AdvertisingExtraBold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 800 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Janna LT';
+  src: url('./assets/brand/fonts/Janna-LT-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Janna LT';
+  src: url('./assets/brand/fonts/Janna-LT-Bold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* Auth screens use the approved brand palette. */
+.auth-page input {
+  background-color: #E6E7E9;
+  border-color: #444444;
+  color: #444444;
+}
+.auth-page button {
+  overflow-wrap: anywhere;
+}
+.auth-page button[type='submit'] {
+  background-color: #871281;
+  color: #E6E7E9;
+}
+
+:root {
+  /* Official Brand Identity Tokens */
+  --color-primary: #C80893;
+  --color-secondary: #871281;
+  --color-charcoal: #444444;
+  --color-green: #83C704;
+  --color-lime: #A9D203;
+  --color-light-gray: #E6E7E9;
+  --color-surface: #FFFFFF;
+  --color-border: #D5D7DC;
+  --color-dark-text: #262626;
+
+  /* Spacing Scale Tokens */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+}
+
+body {
+  margin: 0;
+  font-family: 'Janna LT', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-light-gray);
+  color: var(--color-dark-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-page-heading {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(68, 68, 68, 0.08);
+}
+
+.app-page-heading::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--color-primary);
+}
+
+.app-page-heading h1 {
+  margin-block: 6px 0;
+  font-size: clamp(1.5rem, 2.4vw, 1.875rem);
+  line-height: 1.35;
+}
+
+.app-page-heading p {
+  margin-block-start: 6px;
+  color: var(--color-charcoal);
+  line-height: 1.65;
+}
+
+@media (max-width: 640px) {
+  .app-page-heading {
+    padding: 16px 18px;
+  }
+}
+
+h1, h2, h3 {
+  font-family: 'Advertising ExtraBold', 'Janna LT', sans-serif;
+  font-weight: 800;
+}
+
+/* Ensure Latin numerals 0-9 throughout text and UI */
+* {
+  font-feature-settings: "latn" 1;
+}
+
+/* Accessible focus outline */
+:focus-visible {
+  outline: 2px solid #871281;
+  outline-offset: 2px;
+}
+
+/* Hide scrollbar for clean tab bars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Application surfaces follow the supplied dark institutional UI references. */
+.app-theme-dark {
+  --app-bg: #171219;
+  --app-surface: #211a24;
+  --app-raised: #2b202e;
+  --app-border: #4b354f;
+  --app-text: #f3eaf3;
+  --app-muted: #d0c2d2;
+  --app-pink: #ef80d1;
+  color-scheme: dark;
+  background: var(--app-bg) !important;
+  color: var(--app-text) !important;
+}
+
+.app-theme-light {
+  --app-bg: #e6e7e9;
+  --app-surface: #ffffff;
+  --app-raised: #f7f7f8;
+  --app-border: #d5d7dc;
+  --app-text: #262626;
+  --app-muted: #55515a;
+  --app-pink: #871281;
+  color-scheme: light;
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.app-theme-dark,
+.app-theme-light { transition: background-color 180ms ease, color 180ms ease; }
+
+.app-theme-dark [class~="bg-white"] { background-color: var(--app-surface) !important; }
+.app-theme-dark [class~="bg-brand-lightGray"] { background-color: var(--app-bg) !important; }
+.app-theme-dark [class~="bg-brand-surface"] { background-color: var(--app-surface) !important; }
+.app-theme-dark [class~="bg-gray-50"],
+.app-theme-dark [class~="bg-gray-100"],
+.app-theme-dark [class~="bg-brand-lightGray/70"] { background-color: var(--app-raised) !important; }
+.app-theme-dark [class~="bg-amber-50"] { background-color: #3b2d18 !important; }
+.app-theme-dark [class~="bg-green-50"] { background-color: #183426 !important; }
+.app-theme-dark [class~="bg-red-50"] { background-color: #3b2024 !important; }
+.app-theme-dark [class~="bg-blue-50"] { background-color: #1e293b !important; }
+.app-theme-dark [class~="text-brand-darkText"],
+.app-theme-dark [class~="text-brand-charcoal"],
+.app-theme-dark [class~="text-gray-900"],
+.app-theme-dark [class~="text-gray-800"] { color: var(--app-text) !important; }
+.app-theme-dark [class~="text-brand-charcoal/70"],
+.app-theme-dark [class~="text-brand-charcoal/75"],
+.app-theme-dark [class~="text-brand-charcoal/80"],
+.app-theme-dark [class~="text-brand-charcoal/60"],
+.app-theme-dark [class~="text-gray-600"],
+.app-theme-dark [class~="text-gray-500"] { color: var(--app-muted) !important; }
+.app-theme-dark [class~="text-amber-900"],
+.app-theme-dark [class~="text-amber-800"],
+.app-theme-dark [class~="text-green-800"],
+.app-theme-dark [class~="text-red-600"],
+.app-theme-dark [class~="text-red-700"] { color: #f3dcae !important; }
+.app-theme-dark [class~="text-brand-plum"],
+.app-theme-dark [class~="text-brand-magenta"] { color: var(--app-pink) !important; }
+.app-theme-dark [class~="border-brand-border"],
+.app-theme-dark [class~="border-brand-border/60"],
+.app-theme-dark [class~="border-brand-border/50"],
+.app-theme-dark [class~="border-gray-200"],
+.app-theme-dark [class~="border-gray-300"] { border-color: var(--app-border) !important; }
+.app-theme-dark input:not([type="checkbox"]):not([type="radio"]),
+.app-theme-dark select,
+.app-theme-dark textarea {
+  background-color: #1b151e;
+  border-color: var(--app-border);
+  color: var(--app-text);
+}
+.app-theme-dark input::placeholder,
+.app-theme-dark textarea::placeholder { color: #a999ac; opacity: 1; }
+.app-theme-dark input[type="checkbox"],
+.app-theme-dark input[type="radio"] { accent-color: #c80893; }
+.app-theme-dark table tbody tr { border-color: var(--app-border); }
+.app-theme-dark .app-page-heading { background: var(--app-surface); border-color: var(--app-border); }
+.app-theme-dark header.sticky { background: #1b151e !important; border-color: var(--app-border) !important; }
+
+@media (max-width: 1023px) {
+  .app-theme-dark aside { background-color: #1b151e !important; border-color: var(--app-border) !important; }
+}
+
+/* Match the supplied split login composition while retaining the existing flows. */
+.auth-page > div {
+  overflow: hidden;
+  max-width: 960px;
+  gap: 0;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(48, 17, 48, .14);
+}
+.auth-page > div > section:first-child {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(28px, 5vw, 56px);
+  color: #fff;
+  background: linear-gradient(145deg, #871281, #c80893);
+}
+.auth-page > div > section:first-child .text-brand-plum { color: #fff !important; }
+.auth-page > div > section:first-child h1 { color: #fff; }
+.auth-page > div > section:first-child > img { border-radius: 20px; background: #fff; padding: 10px; }
+.auth-page > div > section:last-child {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: stretch;
+  padding: clamp(24px, 4vw, 48px);
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+}
+.auth-page input:not([type="checkbox"]):not([type="radio"]) { background-color: #fff; border-color: #ead9e8; }
+@media (max-width: 1023px) {
+  .auth-page > div { border-radius: 20px; }
+  .auth-page > div > section:first-child { grid-column: 1; grid-row: 1; }
+  .auth-page > div > section:last-child { grid-column: 1; grid-row: 2; }
+}
