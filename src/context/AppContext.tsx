@@ -21,7 +21,9 @@ interface AppContextType {
   setLanguage: (lang: Language) => void;
   currentUser: User;
   setCurrentUser: (user: User) => void;
+  login: (identifier: string, password: string) => Promise<{ ok: boolean; code?: string; user?: User }>;
   isAuthenticated: boolean;
+  isAuthLoading: boolean;
   signOut: () => void;
   users: User[];
   tasks: Task[];
@@ -60,6 +62,37 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+interface BackendUser {
+  id: string;
+  username: string;
+  arabicName: string;
+  role: UserRole;
+  jobTitleAr: string;
+  email: string;
+  mobile?: string;
+  isActive: boolean;
+  departmentId?: string;
+  departmentAr: string;
+}
+
+function mapBackendUser(user: BackendUser): User {
+  return {
+    id: user.id,
+    username: user.username,
+    arabicName: user.arabicName,
+    englishName: user.arabicName,
+    role: user.role,
+    jobTitleAr: user.jobTitleAr,
+    jobTitleEn: user.jobTitleAr,
+    email: user.email,
+    mobile: user.mobile,
+    isActive: user.isActive,
+    departmentAr: user.departmentAr,
+    departmentEn: user.departmentAr,
+    preferredLanguage: 'ar',
+  };
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language] = useState<Language>('ar');
   const [theme, setTheme] = useState<DisplayTheme>(() => {
@@ -67,21 +100,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     catch { return 'dark'; }
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    try {
-      const savedId = sessionStorage.getItem('demo_session_user');
-      const savedUsers = JSON.parse(localStorage.getItem('official_users') || '[]') as User[];
-      return MOCK_USERS.some(user => user.id === savedId) || savedUsers.some(user => user.id === savedId && user.isActive);
-    } catch { return false; }
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   // Keep a harmless fallback for pages such as sign-in; AppShell blocks every internal route until authentication.
   const [currentUser, setCurrentUser] = useState<User>(() => {
     try {
-      const savedId = sessionStorage.getItem('demo_session_user');
       const savedUsers = JSON.parse(localStorage.getItem('official_users') || '[]') as User[];
-      return savedUsers.find(user => user.id === savedId) || MOCK_USERS.find(user => user.id === savedId) || MOCK_USERS.find(user => user.id === 'U-002') || MOCK_USERS[0];
+      return savedUsers[0] || MOCK_USERS.find(user => user.id === 'U-002') || MOCK_USERS[0];
     } catch { return MOCK_USERS.find(user => user.id === 'U-002') || MOCK_USERS[0]; }
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(async response => {
+        if (!response.ok) return null;
+        return await response.json() as { user?: BackendUser };
+      })
+      .then(payload => {
+        if (cancelled || !payload?.user) return;
+        setCurrentUser(mapBackendUser(payload.user));
+        setIsAuthenticated(true);
+      })
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setIsAuthLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const [users, setUsers] = useState<User[]>(() => {
     try {
@@ -193,12 +237,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const signIn = (user: User) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
-    try { sessionStorage.setItem('demo_session_user', user.id); } catch { /* session remains active until the tab closes */ }
+  };
+  const login = async (identifier: string, password: string) => {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ identifier, password }),
+      });
+      const payload = await response.json() as { code?: string; user?: BackendUser };
+      if (!response.ok || !payload.user) return { ok: false, code: payload.code || 'LOGIN_UNAVAILABLE' };
+      const user = mapBackendUser(payload.user);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      return { ok: true, user };
+    } catch {
+      return { ok: false, code: 'LOGIN_UNAVAILABLE' };
+    }
   };
   const signOut = () => {
+    void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => undefined);
     setIsAuthenticated(false);
     setCurrentUser(MOCK_USERS.find(user => user.id === 'U-002') || MOCK_USERS[0]);
-    try { sessionStorage.removeItem('demo_session_user'); } catch { /* session state still clears in memory */ }
   };
 
   const userNotifications = notifications.filter(n => n.userId === currentUser.id);
@@ -339,7 +400,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setLanguage,
         currentUser,
         setCurrentUser: signIn,
+        login,
         isAuthenticated,
+        isAuthLoading,
         signOut,
         users,
         tasks,
