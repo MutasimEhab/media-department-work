@@ -6,9 +6,11 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "db:migrate": "npm run build && node dist/scripts/migrate.js"
+    "db:migrate": "npm run build && node dist/scripts/migrate.js",
+    "admin:create": "npm run build && node dist/scripts/create-initial-admin.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
