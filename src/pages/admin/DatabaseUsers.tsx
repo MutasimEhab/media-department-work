@@ -128,6 +128,40 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
     }
   }
 
+  async function changeAccountStatus(user: User, isActive: boolean) {
+    const action = isActive ? 'إعادة تفعيل' : 'إيقاف';
+    if (!window.confirm(`هل تريد ${action} حساب ${user.arabicName}؟ ${isActive ? '' : 'سيُمنع من الدخول فوراً، وستبقى سجلاته محفوظة.'}`)) return;
+    setError('');
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(user.id)}/status`, {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'تعذر تغيير حالة الحساب.');
+      await loadUsers();
+      setNotice(`تم ${action} الحساب بنجاح.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+    }
+  }
+
+  async function deleteAccount(user: User) {
+    if (!window.confirm(`سيُحذف حساب ${user.arabicName} نهائياً. إذا كان مرتبطاً بسجلات، سيرفض النظام الحذف وسيبقى بإمكانك إيقافه. هل تريد المتابعة؟`)) return;
+    setError('');
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(user.id)}`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'تعذر حذف الحساب.');
+      await loadUsers();
+      setNotice('تم حذف الحساب نهائياً.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+    }
+  }
+
   return <main className="space-y-4">
     <header className="flex flex-wrap items-center justify-between gap-3 app-page-heading">
       <div><h1 className="text-2xl font-bold">إدارة المستخدمين</h1><p>الحسابات المعروضة محفوظة في قاعدة البيانات.</p></div>
@@ -158,7 +192,12 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
         <select className="min-h-10 rounded-input border border-brand-border bg-transparent px-3" value={role} onChange={(event) => setRole(event.target.value)}><option value="">كل الأدوار</option>{Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <Button variant="outline" onClick={() => void loadUsers()}>تحديث القائمة</Button>
       </div>
-      {loading ? <p className="mt-4">جارٍ تحميل الحسابات…</p> : visibleUsers.length ? <div className="mt-4 space-y-3">{visibleUsers.map((user) => <article key={user.id} className="flex flex-wrap justify-between gap-3 rounded-lg border border-brand-border p-4"><div><b>{user.arabicName}</b><p>{user.jobTitleAr} · {roleLabels[user.role]} · {user.isActive ? 'نشط' : 'غير نشط'}</p><p>{user.departmentAr}</p><p dir="ltr">{user.username} · {user.email} · {user.mobile || '—'}</p></div>{user.role !== 'ADMIN' && (currentUser.role === 'ADMIN' || ((currentUser.role === 'MANAGER' || currentUser.role === 'DEPUTY') && user.role === 'EMPLOYEE')) && <Button size="sm" variant="outline" onClick={() => void openPermissions(user)}>إدارة الصلاحيات</Button>}</article>)}</div> : <p className="mt-4">لا توجد حسابات مطابقة.</p>}
+      {loading ? <p className="mt-4">جارٍ تحميل الحسابات…</p> : visibleUsers.length ? <div className="mt-4 space-y-3">{visibleUsers.map((user) => {
+        const canManageAccount = currentUser.role === 'ADMIN'
+          ? user.role !== 'ADMIN'
+          : (currentUser.role === 'MANAGER' || currentUser.role === 'DEPUTY') && user.role === 'EMPLOYEE';
+        return <article key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-border p-4"><div><b>{user.arabicName}</b><p>{user.jobTitleAr} · {roleLabels[user.role]} · {user.isActive ? 'نشط' : 'غير نشط'}</p><p>{user.departmentAr}</p><p dir="ltr">{user.username} · {user.email} · {user.mobile || '—'}</p></div>{canManageAccount && <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void openPermissions(user)}>إدارة الصلاحيات</Button><Button size="sm" variant="outline" onClick={() => void changeAccountStatus(user, !user.isActive)}>{user.isActive ? 'إيقاف الحساب' : 'إعادة التفعيل'}</Button><Button size="sm" variant="danger" onClick={() => void deleteAccount(user)}>حذف الحساب</Button></div>}</article>;
+      })}</div> : <p className="mt-4">لا توجد حسابات مطابقة.</p>}
     </Card>
 
     {permissionTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !permissionSaving) setPermissionTarget(null); }}><section className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 text-brand-darkText shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="permission-heading"><h2 id="permission-heading" className="text-xl font-bold">صلاحيات {permissionTarget.arabicName}</h2>{permissionLoading ? <p className="mt-4">جارٍ تحميل الصلاحيات…</p> : <div className="mt-4 grid gap-2 sm:grid-cols-2">{permissionOptions.map((permission) => <label key={permission.code} className="flex items-center gap-2 rounded-lg border border-brand-border p-3"><input type="checkbox" checked={permissionSelection.includes(permission.code)} onChange={(event) => setPermissionSelection((current) => event.target.checked ? [...current, permission.code] : current.filter((code) => code !== permission.code))}/><span>{permission.name_ar}</span></label>)}</div>}{error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}<div className="mt-4 flex gap-2"><Button disabled={permissionLoading || permissionSaving} onClick={() => void savePermissions()}>{permissionSaving ? 'جارٍ الحفظ…' : 'حفظ الصلاحيات'}</Button><Button variant="outline" disabled={permissionSaving} onClick={() => setPermissionTarget(null)}>إلغاء</Button></div></section></div>}

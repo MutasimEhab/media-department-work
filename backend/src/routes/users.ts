@@ -62,6 +62,113 @@ router.get('/departments', async (_request, response) => {
   response.json({ departments: result.rows.map((row) => ({ id: row.id, nameAr: row.name_ar })) });
 });
 
+router.patch('/:userId/status', async (request: AuthenticatedRequest, response) => {
+  const { target, allowed } = await findManageableTarget(request, routeUserId(request));
+  if (!target) {
+    response.status(404).json({ message: 'المستخدم غير موجود.' });
+    return;
+  }
+  if (!allowed) {
+    response.status(403).json({ message: 'لا تملك صلاحية تغيير حالة هذا الحساب.' });
+    return;
+  }
+  const isActive = request.body?.isActive;
+  if (typeof isActive !== 'boolean') {
+    response.status(400).json({ message: 'حالة الحساب غير صالحة.' });
+    return;
+  }
+  if (target.id === request.authUser!.id && !isActive) {
+    response.status(409).json({ message: 'لا يمكنك إيقاف حسابك الحالي.' });
+    return;
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    if (!isActive && target.role_code === 'system_admin') {
+      await client.query('SELECT pg_advisory_xact_lock(97412026)');
+      const activeAdmins = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM users
+          WHERE role_code = 'system_admin' AND is_active = true`,
+      );
+      if (Number(activeAdmins.rows[0]?.count ?? 0) <= 1) {
+        await client.query('ROLLBACK');
+        response.status(409).json({ message: 'لا يمكن إيقاف آخر حساب نشط لمدير النظام.' });
+        return;
+      }
+    }
+    await client.query(
+      'UPDATE users SET is_active = $2, updated_at = now() WHERE id = $1',
+      [target.id, isActive],
+    );
+    if (!isActive) {
+      await client.query(
+        'UPDATE login_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL',
+        [target.id],
+      );
+    }
+    await client.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, $2, 'users', $3, $4::jsonb)`,
+      [request.authUser!.id, isActive ? 'user.activate' : 'user.deactivate', target.id, JSON.stringify({ isActive })],
+    );
+    await client.query('COMMIT');
+    response.json({ userId: target.id, isActive });
+  } catch {
+    await client.query('ROLLBACK');
+    response.status(503).json({ message: 'تعذر تغيير حالة الحساب حالياً.' });
+  } finally {
+    client.release();
+  }
+});
+
+router.delete('/:userId', async (request: AuthenticatedRequest, response) => {
+  const { target, allowed } = await findManageableTarget(request, routeUserId(request));
+  if (!target) {
+    response.status(404).json({ message: 'المستخدم غير موجود.' });
+    return;
+  }
+  if (!allowed) {
+    response.status(403).json({ message: 'لا تملك صلاحية حذف هذا الحساب.' });
+    return;
+  }
+  if (target.id === request.authUser!.id || target.role_code === 'system_admin') {
+    response.status(409).json({ message: 'لا يمكن حذف حساب مدير النظام أو حسابك الحالي.' });
+    return;
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const user = await client.query<{ full_name_ar: string; role_code: string }>(
+      'SELECT full_name_ar, role_code FROM users WHERE id = $1 FOR UPDATE',
+      [target.id],
+    );
+    if (!user.rowCount) {
+      await client.query('ROLLBACK');
+      response.status(404).json({ message: 'المستخدم غير موجود.' });
+      return;
+    }
+    await client.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, 'user.delete', 'users', $2, $3::jsonb)`,
+      [request.authUser!.id, target.id, JSON.stringify(user.rows[0])],
+    );
+    await client.query('DELETE FROM users WHERE id = $1', [target.id]);
+    await client.query('COMMIT');
+    response.json({ userId: target.id, deleted: true });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23503') {
+      response.status(409).json({ message: 'لا يمكن حذف الحساب لأنه مرتبط بسجلات. أوقفه بدلاً من ذلك للحفاظ على البيانات.' });
+      return;
+    }
+    response.status(503).json({ message: 'تعذر حذف الحساب حالياً.' });
+  } finally {
+    client.release();
+  }
+});
+
 router.get('/:userId/permissions', async (request: AuthenticatedRequest, response) => {
   const { target, allowed } = await findManageableTarget(request, routeUserId(request));
   if (!target) {
