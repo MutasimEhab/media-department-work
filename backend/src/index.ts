@@ -4,6 +4,7 @@ import express from 'express';
 import helmet from 'helmet';
 import { db } from './db.js';
 import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -15,6 +16,7 @@ app.use(cors({ origin: frontendOrigin, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 
 app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
 
 app.get('/api/health', async (_request, response) => {
   try {
