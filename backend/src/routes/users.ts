@@ -33,6 +33,26 @@ function canManageUsers(request: AuthenticatedRequest): boolean {
     || Boolean(request.permissions?.includes('users.create_employee'));
 }
 
+function routeUserId(request: AuthenticatedRequest): string {
+  const value = request.params.userId;
+  return Array.isArray(value) ? value[0] ?? '' : value ?? '';
+}
+
+async function findManageableTarget(request: AuthenticatedRequest, userId: string) {
+  const result = await db.query<{ id: string; role_code: string; department_id: string | null }>(
+    'SELECT id, role_code, department_id FROM users WHERE id = $1',
+    [userId],
+  );
+  const target = result.rows[0];
+  if (!target) return { target: null, allowed: false };
+  const actor = request.authUser!;
+  const allowed = actor.roleCode === 'system_admin'
+    || (['department_manager', 'deputy_manager'].includes(actor.roleCode)
+      && target.role_code === 'employee'
+      && target.department_id === actor.departmentId);
+  return { target, allowed };
+}
+
 router.use(requireAuth);
 
 router.get('/departments', async (_request, response) => {
@@ -40,6 +60,82 @@ router.get('/departments', async (_request, response) => {
     'SELECT id, name_ar FROM departments ORDER BY name_ar',
   );
   response.json({ departments: result.rows.map((row) => ({ id: row.id, nameAr: row.name_ar })) });
+});
+
+router.get('/:userId/permissions', async (request: AuthenticatedRequest, response) => {
+  const { target, allowed } = await findManageableTarget(request, routeUserId(request));
+  if (!target) {
+    response.status(404).json({ message: 'المستخدم غير موجود.' });
+    return;
+  }
+  if (!allowed) {
+    response.status(403).json({ message: 'تستطيع إدارة صلاحيات موظفي دائرتك فقط.' });
+    return;
+  }
+  const result = await db.query<{ code: string; name_ar: string; enabled: boolean }>(
+    `SELECT p.code, p.name_ar,
+            COALESCE(upo.is_granted, rp.permission_code IS NOT NULL) AS enabled
+       FROM permissions p
+       LEFT JOIN role_permissions rp ON rp.permission_code = p.code AND rp.role_code = $1
+       LEFT JOIN user_permission_overrides upo ON upo.permission_code = p.code AND upo.user_id = $2
+      ORDER BY p.name_ar`,
+    [target.role_code, target.id],
+  );
+  const restricted = request.authUser!.roleCode !== 'system_admin';
+  const permissions = result.rows.filter((permission) => !restricted
+    || !['users.', 'permissions.', 'system.'].some((prefix) => permission.code.startsWith(prefix)));
+  response.json({ permissions });
+});
+
+router.put('/:userId/permissions', async (request: AuthenticatedRequest, response) => {
+  const { target, allowed } = await findManageableTarget(request, routeUserId(request));
+  if (!target) {
+    response.status(404).json({ message: 'المستخدم غير موجود.' });
+    return;
+  }
+  if (!allowed) {
+    response.status(403).json({ message: 'تستطيع إدارة صلاحيات موظفي دائرتك فقط.' });
+    return;
+  }
+  if (!Array.isArray(request.body?.permissionCodes)
+    || request.body.permissionCodes.some((code: unknown) => typeof code !== 'string')) {
+    response.status(400).json({ message: 'قائمة الصلاحيات غير صالحة.' });
+    return;
+  }
+  const requested = [...new Set(request.body.permissionCodes as string[])];
+  const result = await db.query<{ code: string }>('SELECT code FROM permissions');
+  const known = new Set(result.rows.map((row) => row.code));
+  const restricted = request.authUser!.roleCode !== 'system_admin';
+  const forbidden = requested.some((code) => !known.has(code)
+    || (restricted && ['users.', 'permissions.', 'system.'].some((prefix) => code.startsWith(prefix))));
+  if (forbidden || target.role_code === 'system_admin') {
+    response.status(400).json({ message: 'لا يمكن منح هذه الصلاحية لهذا الحساب.' });
+    return;
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO user_permission_overrides (user_id, permission_code, is_granted, changed_by)
+       SELECT $1, p.code, p.code = ANY($2::text[]), $3 FROM permissions p
+       ON CONFLICT (user_id, permission_code) DO UPDATE
+         SET is_granted = EXCLUDED.is_granted, changed_by = EXCLUDED.changed_by, changed_at = now()`,
+      [target.id, requested, request.authUser!.id],
+    );
+    await client.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, 'user.permissions.update', 'users', $2, $3::jsonb)`,
+      [request.authUser!.id, target.id, JSON.stringify({ permissionCodes: requested })],
+    );
+    await client.query('COMMIT');
+    response.json({ permissionCodes: requested });
+  } catch {
+    await client.query('ROLLBACK');
+    response.status(503).json({ message: 'تعذر حفظ الصلاحيات حالياً.' });
+  } finally {
+    client.release();
+  }
 });
 
 router.get('/', async (request: AuthenticatedRequest, response) => {
