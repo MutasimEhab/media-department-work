@@ -24,6 +24,7 @@ function ask(prompt: string, secret = false): Promise<string> {
       finished = true;
       input.removeListener('data', onData);
       input.setRawMode(false);
+      input.pause();
       process.stdout.write('\n');
       if (error) reject(error);
       else resolve(value);
