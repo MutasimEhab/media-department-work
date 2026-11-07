@@ -64,8 +64,8 @@ async function main() {
   if (!fullNameAr || !username || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('الاسم واسم المستخدم والبريد الإلكتروني مطلوبة، والبريد يجب أن يكون صالحاً.');
   }
-  if (password.length < 10 || Buffer.byteLength(password, 'utf8') > 72) {
-    throw new Error('كلمة المرور يجب أن تكون 10 أحرف على الأقل وألا تتجاوز 72 بايتاً.');
+  if (password.length < 9 || Buffer.byteLength(password, 'utf8') > 72) {
+    throw new Error('كلمة المرور يجب أن تكون 9 أحرف أو أرقام على الأقل وألا تتجاوز 72 بايتاً.');
   }
   if (password !== confirmation) throw new Error('كلمتا المرور غير متطابقتين.');
 

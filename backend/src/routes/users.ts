@@ -181,8 +181,8 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
     response.status(400).json({ message: 'نوع الحساب المحدد غير مسموح.' });
     return;
   }
-  if (password.length < 10 || Buffer.byteLength(password, 'utf8') > 72) {
-    response.status(400).json({ message: 'كلمة المرور يجب أن تكون 10 أحرف على الأقل ولا تتجاوز 72 بايتاً.' });
+  if (password.length < 9 || Buffer.byteLength(password, 'utf8') > 72) {
+    response.status(400).json({ message: 'كلمة المرور يجب أن تكون 9 أحرف أو أرقام على الأقل ولا تتجاوز 72 بايتاً.' });
     return;
   }
 

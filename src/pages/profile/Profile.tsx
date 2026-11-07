@@ -24,7 +24,7 @@ export const Profile: React.FC = () => {
   }, [dirty]);
 
   function save() {
-    if ((password || confirm) && password.length < 10) { setMessage('يجب أن تتكون كلمة المرور من ١٠ أحرف على الأقل.'); return; }
+    if ((password || confirm) && password.length < 9) { setMessage('يجب أن تتكون كلمة المرور من ٩ أحرف أو أرقام على الأقل.'); return; }
     if (password !== confirm) { setMessage('كلمتا المرور غير متطابقتين.'); return; }
     const ok = updateUser({ ...currentUser, arabicName: name, englishName: name, mobile, preferredLanguage: 'ar' });
     setMessage(ok ? 'تم حفظ تعديلات الملف الشخصي في هذه النسخة.' : 'تعذر حفظ التعديلات.');
