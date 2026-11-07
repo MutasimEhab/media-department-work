@@ -19,6 +19,7 @@ function publicUser(row: Record<string, unknown>) {
     arabicName: row.full_name_ar,
     role: codeToRole[String(row.role_code)] ?? 'EMPLOYEE',
     jobTitleAr: row.job_title_ar,
+    employeeNumber: row.employee_number ?? undefined,
     email: row.email,
     mobile: row.mobile ?? undefined,
     isActive: row.is_active,
@@ -169,6 +170,46 @@ router.delete('/:userId', async (request: AuthenticatedRequest, response) => {
   }
 });
 
+router.patch('/:userId/profile', async (request: AuthenticatedRequest, response) => {
+  const { target, allowed } = await findManageableTarget(request, routeUserId(request));
+  if (!target) {
+    response.status(404).json({ message: 'المستخدم غير موجود.' });
+    return;
+  }
+  if (!allowed) {
+    response.status(403).json({ message: 'لا تملك صلاحية تعديل بيانات هذا الحساب.' });
+    return;
+  }
+  const jobTitleAr = typeof request.body?.jobTitleAr === 'string' ? request.body.jobTitleAr.trim() : '';
+  const employeeNumber = typeof request.body?.employeeNumber === 'string' ? request.body.employeeNumber.trim() : '';
+  if (!jobTitleAr || !employeeNumber || employeeNumber.length > 40) {
+    response.status(400).json({ message: 'المسمى الوظيفي والرقم الوظيفي مطلوبان، والرقم حتى 40 خانة.' });
+    return;
+  }
+  try {
+    const updated = await db.query(
+      `UPDATE users SET job_title_ar = $2, employee_number = $3, updated_at = now()
+        WHERE id = $1
+        RETURNING id, username, email, full_name_ar, job_title_ar, employee_number, mobile,
+                  role_code, is_active, department_id, last_login_at`,
+      [target.id, jobTitleAr, employeeNumber],
+    );
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, 'user.profile.update', 'users', $2, $3::jsonb)`,
+      [request.authUser!.id, target.id, JSON.stringify({ jobTitleAr, employeeNumber })],
+    );
+    const department = await db.query<{ name_ar: string }>('SELECT name_ar FROM departments WHERE id = $1', [target.department_id]);
+    response.json({ user: publicUser({ ...updated.rows[0], department_name_ar: department.rows[0]?.name_ar ?? '' }) });
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+      response.status(409).json({ message: 'الرقم الوظيفي مستخدم لحساب آخر.' });
+      return;
+    }
+    response.status(503).json({ message: 'تعذر حفظ بيانات الحساب حالياً.' });
+  }
+});
+
 router.get('/:userId/permissions', async (request: AuthenticatedRequest, response) => {
   const { target, allowed } = await findManageableTarget(request, routeUserId(request));
   if (!target) {
@@ -252,7 +293,7 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
   }
   const { roleCode, departmentId } = request.authUser!;
   const result = await db.query(
-    `SELECT u.id, u.username, u.email, u.full_name_ar, u.job_title_ar, u.mobile,
+    `SELECT u.id, u.username, u.email, u.full_name_ar, u.job_title_ar, u.employee_number, u.mobile,
             u.role_code, u.is_active, u.department_id, u.last_login_at,
             d.name_ar AS department_name_ar
        FROM users u
@@ -277,11 +318,12 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
   const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const jobTitleAr = typeof body.jobTitleAr === 'string' ? body.jobTitleAr.trim() : '';
+  const employeeNumber = typeof body.employeeNumber === 'string' ? body.employeeNumber.trim() : '';
   const mobile = typeof body.mobile === 'string' ? body.mobile.trim() : null;
   const password = typeof body.password === 'string' ? body.password : '';
 
-  if (!fullNameAr || !username || !jobTitleAr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    response.status(400).json({ message: 'أدخل الاسم العربي واسم المستخدم والبريد والمسمى الوظيفي بشكل صحيح.' });
+  if (!fullNameAr || !username || !jobTitleAr || !employeeNumber || employeeNumber.length > 40 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    response.status(400).json({ message: 'أدخل الاسم العربي واسم المستخدم والبريد والمسمى والرقم الوظيفي بشكل صحيح.' });
     return;
   }
   if (!targetRole || targetRole === 'system_admin') {
@@ -314,17 +356,17 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
     const passwordHash = await bcrypt.hash(password, 12);
     const created = await db.query(
       `INSERT INTO users (department_id, role_code, username, email, password_hash,
-                          full_name_ar, job_title_ar, mobile, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                          full_name_ar, job_title_ar, employee_number, mobile, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id, username, email, full_name_ar, job_title_ar, mobile,
-                 role_code, is_active, department_id, last_login_at`,
-      [departmentId, targetRole, username, email, passwordHash, fullNameAr, jobTitleAr, mobile || null, actor.id],
+                 employee_number, role_code, is_active, department_id, last_login_at`,
+      [departmentId, targetRole, username, email, passwordHash, fullNameAr, jobTitleAr, employeeNumber, mobile || null, actor.id],
     );
     const department = await db.query<{ name_ar: string }>('SELECT name_ar FROM departments WHERE id = $1', [departmentId]);
     response.status(201).json({ user: publicUser({ ...created.rows[0], department_name_ar: department.rows[0]?.name_ar ?? '' }) });
   } catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
-      response.status(409).json({ message: 'اسم المستخدم أو البريد الإلكتروني مستخدم مسبقاً.' });
+      response.status(409).json({ message: 'اسم المستخدم أو البريد أو الرقم الوظيفي مستخدم مسبقاً.' });
       return;
     }
     response.status(503).json({ message: 'تعذر إنشاء الحساب حالياً.' });

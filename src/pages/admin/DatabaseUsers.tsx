@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { User, UserRole } from '../../types';
+import { useApp } from '../../context/AppContext';
 
 interface DepartmentOption { id: string; nameAr: string }
 interface PermissionOption { code: string; name_ar: string; enabled: boolean }
@@ -11,6 +12,7 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) => {
+  const { setCurrentUser } = useApp();
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [query, setQuery] = useState('');
@@ -25,8 +27,11 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
   const [permissionSelection, setPermissionSelection] = useState<string[]>([]);
   const [permissionLoading, setPermissionLoading] = useState(false);
   const [permissionSaving, setPermissionSaving] = useState(false);
+  const [profileTarget, setProfileTarget] = useState<User | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileForm, setProfileForm] = useState({ jobTitleAr: '', employeeNumber: '' });
   const [form, setForm] = useState({
-    arabicName: '', username: '', email: '', jobTitleAr: '', mobile: '',
+    arabicName: '', username: '', email: '', jobTitleAr: '', employeeNumber: '', mobile: '',
     role: 'EMPLOYEE' as UserRole, departmentId: '', password: '',
   });
 
@@ -79,7 +84,7 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'تعذر إنشاء الحساب.');
       setNotice('تم إنشاء الحساب وحفظه في قاعدة البيانات. أعطِ الموظف اسم المستخدم وكلمة المرور بشكل آمن.');
-      setForm((previous) => ({ ...previous, arabicName: '', username: '', email: '', jobTitleAr: '', mobile: '', password: '' }));
+      setForm((previous) => ({ ...previous, arabicName: '', username: '', email: '', jobTitleAr: '', employeeNumber: '', mobile: '', password: '' }));
       setShowForm(false);
       await loadUsers();
     } catch (cause) {
@@ -125,6 +130,37 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
     } finally {
       setPermissionSaving(false);
+    }
+  }
+
+  function editProfile(user: User) {
+    setProfileTarget(user);
+    setProfileForm({ jobTitleAr: user.jobTitleAr, employeeNumber: user.employeeNumber ?? '' });
+    setError('');
+  }
+
+  async function saveProfile(event: React.FormEvent) {
+    event.preventDefault();
+    if (!profileTarget) return;
+    setProfileSaving(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(profileTarget.id)}/profile`, {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileForm),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'تعذر حفظ البيانات.');
+      if (profileTarget.id === currentUser.id) {
+        setCurrentUser({ ...currentUser, jobTitleAr: profileForm.jobTitleAr.trim(), employeeNumber: profileForm.employeeNumber.trim() });
+      }
+      setProfileTarget(null);
+      await loadUsers();
+      setNotice('تم تحديث المسمى الوظيفي والرقم الوظيفي.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+    } finally {
+      setProfileSaving(false);
     }
   }
 
@@ -177,6 +213,7 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
         <label className="text-sm">اسم المستخدم<input required autoComplete="off" dir="ltr" className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })}/></label>
         <label className="text-sm">البريد الإلكتروني<input required type="email" dir="ltr" className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })}/></label>
         <label className="text-sm">المسمى الوظيفي<input required className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={form.jobTitleAr} onChange={(event) => setForm({ ...form, jobTitleAr: event.target.value })}/></label>
+        <label className="text-sm">الرقم الوظيفي<input required maxLength={40} dir="ltr" inputMode="numeric" className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={form.employeeNumber} onChange={(event) => setForm({ ...form, employeeNumber: event.target.value })}/></label>
         <label className="text-sm">رقم الاتصال<input dir="ltr" className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={form.mobile} onChange={(event) => setForm({ ...form, mobile: event.target.value })}/></label>
         <label className="text-sm">الدور<select className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as UserRole })}>{allowedRoles.map((value) => <option key={value} value={value}>{roleLabels[value]}</option>)}</select></label>
         {currentUser.role === 'ADMIN' && <label className="text-sm">الدائرة<select required className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={form.departmentId} onChange={(event) => setForm({ ...form, departmentId: event.target.value })}>{departments.map((item) => <option key={item.id} value={item.id}>{item.nameAr}</option>)}</select></label>}
@@ -196,10 +233,13 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
         const canManageAccount = currentUser.role === 'ADMIN'
           ? user.role !== 'ADMIN'
           : (currentUser.role === 'MANAGER' || currentUser.role === 'DEPUTY') && user.role === 'EMPLOYEE';
-        return <article key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-border p-4"><div><b>{user.arabicName}</b><p>{user.jobTitleAr} · {roleLabels[user.role]} · {user.isActive ? 'نشط' : 'غير نشط'}</p><p>{user.departmentAr}</p><p dir="ltr">{user.username} · {user.email} · {user.mobile || '—'}</p></div>{canManageAccount && <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void openPermissions(user)}>إدارة الصلاحيات</Button><Button size="sm" variant="outline" onClick={() => void changeAccountStatus(user, !user.isActive)}>{user.isActive ? 'إيقاف الحساب' : 'إعادة التفعيل'}</Button><Button size="sm" variant="danger" onClick={() => void deleteAccount(user)}>حذف الحساب</Button></div>}</article>;
+        const canEditProfile = currentUser.role === 'ADMIN'
+          || (currentUser.role === 'MANAGER' || currentUser.role === 'DEPUTY') && user.role === 'EMPLOYEE';
+        return <article key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-border p-4"><div><b>{user.arabicName}</b><p>{user.jobTitleAr} · {roleLabels[user.role]} · {user.isActive ? 'نشط' : 'غير نشط'}</p><p>الرقم الوظيفي: <span dir="ltr">{user.employeeNumber || 'غير محدد'}</span></p><p>{user.departmentAr}</p><p dir="ltr">{user.username} · {user.email} · {user.mobile || '—'}</p></div><div className="flex flex-wrap gap-2">{canEditProfile && <Button size="sm" variant="outline" onClick={() => editProfile(user)}>تعديل المسمى والرقم</Button>}{canManageAccount && <><Button size="sm" variant="outline" onClick={() => void openPermissions(user)}>إدارة الصلاحيات</Button><Button size="sm" variant="outline" onClick={() => void changeAccountStatus(user, !user.isActive)}>{user.isActive ? 'إيقاف الحساب' : 'إعادة التفعيل'}</Button><Button size="sm" variant="danger" onClick={() => void deleteAccount(user)}>حذف الحساب</Button></>}</div></article>;
       })}</div> : <p className="mt-4">لا توجد حسابات مطابقة.</p>}
     </Card>
 
     {permissionTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !permissionSaving) setPermissionTarget(null); }}><section className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 text-brand-darkText shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="permission-heading"><h2 id="permission-heading" className="text-xl font-bold">صلاحيات {permissionTarget.arabicName}</h2>{permissionLoading ? <p className="mt-4">جارٍ تحميل الصلاحيات…</p> : <div className="mt-4 grid gap-2 sm:grid-cols-2">{permissionOptions.map((permission) => <label key={permission.code} className="flex items-center gap-2 rounded-lg border border-brand-border p-3"><input type="checkbox" checked={permissionSelection.includes(permission.code)} onChange={(event) => setPermissionSelection((current) => event.target.checked ? [...current, permission.code] : current.filter((code) => code !== permission.code))}/><span>{permission.name_ar}</span></label>)}</div>}{error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}<div className="mt-4 flex gap-2"><Button disabled={permissionLoading || permissionSaving} onClick={() => void savePermissions()}>{permissionSaving ? 'جارٍ الحفظ…' : 'حفظ الصلاحيات'}</Button><Button variant="outline" disabled={permissionSaving} onClick={() => setPermissionTarget(null)}>إلغاء</Button></div></section></div>}
+    {profileTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !profileSaving) setProfileTarget(null); }}><section className="w-full max-w-lg rounded-xl bg-white p-5 text-brand-darkText shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="profile-heading"><h2 id="profile-heading" className="text-xl font-bold">تعديل بيانات {profileTarget.arabicName}</h2><form className="mt-4 space-y-3" onSubmit={saveProfile}><label className="block text-sm">المسمى الوظيفي<input required className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={profileForm.jobTitleAr} onChange={(event) => setProfileForm({ ...profileForm, jobTitleAr: event.target.value })}/></label><label className="block text-sm">الرقم الوظيفي<input required maxLength={40} dir="ltr" inputMode="numeric" className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={profileForm.employeeNumber} onChange={(event) => setProfileForm({ ...profileForm, employeeNumber: event.target.value })}/></label>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<div className="flex gap-2"><Button type="submit" disabled={profileSaving}>{profileSaving ? 'جارٍ الحفظ…' : 'حفظ التعديل'}</Button><Button type="button" variant="outline" disabled={profileSaving} onClick={() => setProfileTarget(null)}>إلغاء</Button></div></form></section></div>}
   </main>;
 };

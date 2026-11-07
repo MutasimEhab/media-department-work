@@ -68,6 +68,7 @@ interface BackendUser {
   arabicName: string;
   role: UserRole;
   jobTitleAr: string;
+  employeeNumber?: string;
   email: string;
   mobile?: string;
   isActive: boolean;
@@ -83,6 +84,7 @@ function mapBackendUser(user: BackendUser): User {
     englishName: user.arabicName,
     role: user.role,
     jobTitleAr: user.jobTitleAr,
+    employeeNumber: user.employeeNumber,
     jobTitleEn: user.jobTitleAr,
     email: user.email,
     mobile: user.mobile,

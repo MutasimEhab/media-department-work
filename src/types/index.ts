@@ -8,6 +8,7 @@ export interface User {
   jobTitleAr: string;
   jobTitleEn: string;
   username?: string;
+  employeeNumber?: string;
   email: string;
   avatar?: string;
   isActive: boolean;

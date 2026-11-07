@@ -124,42 +124,6 @@ export const Sidebar: React.FC = () => {
       roles: ['ADMIN', 'MANAGER', 'DEPUTY', 'EMPLOYEE'],
       permission: role === 'EMPLOYEE' ? 'view_own_report' : 'view_department_reports',
     },
-    // Admin only
-    {
-      to: '/app/users',
-      label: t.nav.users,
-      icon: <Users className="w-5 h-5" />,
-      roles: ['ADMIN'],
-      permission: 'manage_users',
-    },
-    {
-      to: '/app/settings',
-      label: t.nav.settings,
-      icon: <Settings className="w-5 h-5" />,
-      roles: ['ADMIN'],
-      permission: 'manage_system_settings',
-    },
-    {
-      to: '/app/audit-log',
-      label: t.nav.audit,
-      icon: <ShieldAlert className="w-5 h-5" />,
-      roles: ['ADMIN'],
-      permission: 'view_audit_log',
-    },
-    {
-      to: '/app/system-health',
-      label: t.nav.health,
-      icon: <Activity className="w-5 h-5" />,
-      roles: ['ADMIN'],
-      permission: 'view_system_health',
-    },
-    {
-      to: '/app/admin/backup',
-      label: 'النسخ الاحتياطي',
-      icon: <Database className="w-5 h-5" />,
-      roles: ['ADMIN'],
-      permission: 'manage_system_settings',
-    },
     {
       to: '/app/profile',
       label: t.nav.profile,
@@ -168,7 +132,30 @@ export const Sidebar: React.FC = () => {
     },
   ];
 
+  const adminNavItems: NavItem[] = [
+    { to: '/app/admin/add-work', label: 'إضافة عمل لموظف', icon: <BriefcaseBusiness className="w-5 h-5" />, roles: ['ADMIN'], permission: 'create_work_log' },
+    { to: '/app/admin/work-date-exceptions', label: 'استثناءات التسجيل', icon: <CalendarCheck className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_work_exceptions' },
+    { to: '/app/admin/records', label: 'الكشوفات والتصدير', icon: <BarChart3 className="w-5 h-5" />, roles: ['ADMIN'], permission: 'view_department_reports' },
+    { to: '/app/users', label: t.nav.users, icon: <Users className="w-5 h-5" />, roles: ['ADMIN', 'MANAGER', 'DEPUTY'], permission: 'manage_users' },
+    { to: '/app/admin/account-types', label: 'أنواع الحسابات', icon: <PackageCheck className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
+    { to: '/app/admin/workflow', label: 'إعداد سير العمل', icon: <Activity className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
+    { to: '/app/settings', label: t.nav.settings, icon: <Settings className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
+    { to: '/app/admin/custom-fields', label: 'الخانات الإضافية', icon: <Database className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
+    { to: '/app/audit-log', label: t.nav.audit, icon: <ShieldAlert className="w-5 h-5" />, roles: ['ADMIN'], permission: 'view_audit_log' },
+    { to: '/app/system-health', label: t.nav.health, icon: <Activity className="w-5 h-5" />, roles: ['ADMIN'], permission: 'view_system_health' },
+    { to: '/app/admin/backup', label: 'النسخ الاحتياطي', icon: <CloudUpload className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
+  ];
+
   const allowedNav = navItems.filter(item => !item.permission || canAccess(item.permission));
+  const allowedAdminNav = adminNavItems.filter(item => item.roles.includes(role) && (!item.permission || canAccess(item.permission)));
+  const renderNavItem = (item: NavItem) => {
+    const isWorkHistory = item.to === '/app/work' && location.pathname.startsWith('/app/work/') && !['/app/work/new','/app/work/pending'].includes(location.pathname);
+    const isActive = location.pathname === item.to || isWorkHistory || (!['/app/work', '/app/work/new'].includes(item.to) && location.pathname.startsWith(`${item.to}/`));
+    return <NavLink key={item.to} to={item.to} onClick={() => setIsSidebarOpen(false)} className={`flex min-h-[46px] items-center justify-between rounded-input px-3 py-2.5 text-xs font-subheading transition-colors focus:outline-none focus:ring-2 focus:ring-brand-plum sm:text-sm ${isActive ? 'bg-brand-magenta font-bold text-white shadow-sm' : 'text-brand-charcoal hover:bg-brand-lightGray/70 hover:text-brand-darkText'}`}>
+      <div className="flex min-w-0 items-center gap-3"><span className={`shrink-0 ${isActive ? 'text-white' : 'text-brand-charcoal/80'}`}>{item.icon}</span><span className="truncate">{item.label}</span></div>
+      {typeof item.badge === 'number' && item.badge > 0 && <span className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 font-mono text-[10px] font-bold ${isActive ? 'bg-white text-brand-magenta' : 'bg-brand-magenta text-white'}`} dir="ltr">{item.badge}</span>}
+    </NavLink>;
+  };
 
   return (
     <>
@@ -191,45 +178,11 @@ export const Sidebar: React.FC = () => {
       >
         {/* Navigation Links */}
         <nav className="flex-1 overflow-y-auto p-3 pt-4 space-y-1">
-          {allowedNav.map(item => {
-            const isWorkHistory = item.to === '/app/work' && location.pathname.startsWith('/app/work/') && !['/app/work/new','/app/work/pending'].includes(location.pathname);
-            const isActive = location.pathname === item.to || isWorkHistory || (!['/app/work', '/app/work/new'].includes(item.to) && location.pathname.startsWith(`${item.to}/`));
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={() => setIsSidebarOpen(false)}
-                className={`
-                  flex items-center justify-between px-3 py-2.5 rounded-input text-xs sm:text-sm font-subheading transition-colors min-h-[46px]
-                  focus:outline-none focus:ring-2 focus:ring-brand-plum
-                  ${
-                    isActive
-                      ? 'bg-brand-magenta text-white font-bold shadow-sm'
-                      : 'text-brand-charcoal hover:bg-brand-lightGray/70 hover:text-brand-darkText'
-                  }
-                `}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`shrink-0 ${isActive ? 'text-white' : 'text-brand-charcoal/80'}`}>
-                    {item.icon}
-                  </span>
-                  <span className="truncate">{item.label}</span>
-                </div>
-
-                {typeof item.badge === 'number' && item.badge > 0 && (
-                  <span
-                    className={`
-                      px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold
-                      ${isActive ? 'bg-white text-brand-magenta' : 'bg-brand-magenta text-white'}
-                    `}
-                    dir="ltr"
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </NavLink>
-            );
-          })}
+          {allowedNav.map(renderNavItem)}
+          {allowedAdminNav.length > 0 && <section className="mt-3 space-y-1 border-t border-brand-border pt-3" aria-label="لوحة الإدارة">
+            <h2 className="px-3 pb-1 text-xs font-bold text-brand-plum">لوحة الإدارة</h2>
+            {allowedAdminNav.map(renderNavItem)}
+          </section>}
         </nav>
 
         {/* Footer info */}

@@ -5,7 +5,6 @@ import { Topbar } from './Topbar';
 import { DemoBanner } from './DemoBanner';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { AdminNavigation } from './AdminNavigation';
 
 export const AppShell: React.FC = () => {
   const { isAuthenticated, isAuthLoading, theme } = useApp();
@@ -20,7 +19,6 @@ export const AppShell: React.FC = () => {
         <Sidebar />
         <div className="min-w-0 flex-1 overflow-y-auto">
           <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-5 lg:p-7">
-            {(location.pathname.startsWith('/app/admin/') || ['/app/users','/app/settings','/app/audit-log','/app/system-health'].includes(location.pathname)) && <AdminNavigation />}
             <Outlet />
           </main>
         </div>

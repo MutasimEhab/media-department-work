@@ -175,8 +175,13 @@ export const Topbar: React.FC = () => {
             <div className="w-8 h-8 rounded-full bg-brand-plum text-white font-bold text-xs flex items-center justify-center">
               {(language === 'ar' ? currentUser.arabicName : currentUser.englishName).charAt(0)}
             </div>
-            <span className="text-xs font-bold text-brand-darkText hidden md:inline-block">
-              {language === 'ar' ? currentUser.arabicName : currentUser.englishName}
+            <span className="hidden min-w-0 flex-col items-start md:flex">
+              <span className="max-w-40 truncate text-xs font-bold text-brand-darkText">
+                {language === 'ar' ? currentUser.arabicName : currentUser.englishName}
+              </span>
+              <span className="max-w-48 truncate text-[10px] text-brand-charcoal/70">
+                {currentUser.jobTitleAr || t.roles[currentUser.role]} · الرقم الوظيفي: {currentUser.employeeNumber || '—'}
+              </span>
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-brand-charcoal/70 hidden md:inline-block" />
           </button>
@@ -186,6 +191,7 @@ export const Topbar: React.FC = () => {
               <div className="px-3 py-2 border-b border-brand-border/60">
                 <p className="text-xs font-bold text-brand-darkText">{language === 'ar' ? currentUser.arabicName : currentUser.englishName}</p>
                 <p className="text-[11px] text-brand-charcoal/70 truncate">{currentUser.email}</p>
+                <p className="text-[11px] text-brand-charcoal/70 truncate">{currentUser.jobTitleAr || t.roles[currentUser.role]} · الرقم الوظيفي: {currentUser.employeeNumber || '—'}</p>
                 <span className="inline-block mt-1 text-[10px] bg-brand-plum/10 text-brand-plum font-semibold px-2 py-0.5 rounded">
                   {t.roles[currentUser.role]}
                 </span>
