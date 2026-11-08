@@ -30,6 +30,7 @@ export const AssignmentEditor: React.FC = () => {
   const [sms, setSms] = useState(base?.smsDelivery || false);
   const [reminders, setReminders] = useState(base?.reminderOptions || ['24h', '2h', 'daily']);
   const [error, setError] = useState('');
+  const [serverError, setServerError] = useState('');
   const [busy, setBusy] = useState(false);
   const [simulateError, setSimulateError] = useState(false);
   const sentOnce = useRef(false);
@@ -85,15 +86,17 @@ export const AssignmentEditor: React.FC = () => {
   async function submit(send: boolean) {
     if (busy || sentOnce.current || !validate(send)) return;
     const confirmed = window.confirm(send
-      ? tx(`إرسال التكليف إلى ${assignees.length} موظف؟ سيتم إنشاء إشعار داخلي تجريبي لكل مستلم.`, `Send this assignment to ${assignees.length} employee(s)? A demo internal notification will be created for each recipient.`)
+      ? tx(`إرسال التكليف إلى ${assignees.length} موظف؟ سيصل إشعار داخلي إلى كل مستلم.`, `Send this assignment to ${assignees.length} employee(s)? Each recipient will receive an internal notification.`)
       : tx('حفظ محتوى التكليف كمسودة؟', 'Save assignment content as a draft?'));
     if (!confirmed) return;
     setBusy(true);
     await new Promise(resolve => window.setTimeout(resolve, 500));
     if (simulateError) { setBusy(false); setError('network'); return; }
     const task = makeTask(!send);
-    if (send) { sentOnce.current = true; sendTask(task); }
-    else saveTask(task);
+    setServerError('');
+    const result = send ? await sendTask(task) : await saveTask(task);
+    if (!result.ok) { setBusy(false); setServerError(result.message || 'تعذر حفظ التكليف.'); return; }
+    if (send) sentOnce.current = true;
     setBusy(false);
     navigate('/app/assignments');
   }
@@ -131,6 +134,7 @@ export const AssignmentEditor: React.FC = () => {
 
       <Card title={tx('معاينة الحالة','Preview state')}><label className="flex gap-2"><input type="checkbox" checked={simulateError} onChange={event=>setSimulateError(event.target.checked)}/>{tx('محاكاة خطأ اتصال عند الحفظ','Simulate a network error on save')}</label></Card>
       {error&&<p role="alert" className="p-3 border-s-4 border-brand-plum">{({title:'أدخل عنوان التكليف بالعربية.',description:'أدخل وصف التكليف بالعربية قبل الإرسال.',date:'اختر موعدًا مستقبليًا بعد تاريخ اليوم التجريبي.',time:'أدخل الوقت بصيغة ١٢ ساعة مثل ٠٥:٠٠ م.',url:'يجب أن يبدأ الرابط بـ https://drive.google.com/.',assignees:'اختر موظفًا واحدًا على الأقل.',network:'تعذر الاتصال التجريبي. احتفظنا بالمحتوى؛ أعد المحاولة.'} as Record<string,string>)[error]}</p>}
+      {serverError&&<p role="alert" className="p-3 border-s-4 border-red-600">{serverError}</p>}
       <div className="flex flex-wrap gap-3"><Button type="button" variant="outline" isLoading={busy} disabled={busy} onClick={()=>submit(false)}>{tx('حفظ كمسودة','Save draft')}</Button><Button type="button" isLoading={busy} disabled={busy} onClick={()=>submit(true)}>{tx('إرسال التكليف','Send assignment')}</Button><Button type="button" variant="ghost" onClick={()=>navigate('/app/assignments')}>{tx('إلغاء','Cancel')}</Button></div>
     </form>
   </main>;

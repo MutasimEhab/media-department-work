@@ -13,14 +13,6 @@
 }
 
 @font-face {
-  font-family: 'Advertising ExtraBold';
-  src: url('./assets/brand/fonts/AdvertisingExtraBold.ttf') format('truetype');
-  font-style: normal;
-  font-weight: 800 900;
-  font-display: swap;
-}
-
-@font-face {
   font-family: 'Janna LT';
   src: url('./assets/brand/fonts/Janna-LT-Regular.ttf') format('truetype');
   font-style: normal;
@@ -77,7 +69,7 @@
 
 body {
   margin: 0;
-  font-family: 'Janna LT', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Tajawal', 'Janna LT', 'Segoe UI', system-ui, -apple-system, sans-serif;
   background-color: var(--color-light-gray);
   color: var(--color-dark-text);
   -webkit-font-smoothing: antialiased;
@@ -122,7 +114,7 @@ body {
 }
 
 h1, h2, h3 {
-  font-family: 'Advertising ExtraBold', 'Janna LT', sans-serif;
+  font-family: 'Tajawal', 'Janna LT', sans-serif;
   font-weight: 800;
 }
 

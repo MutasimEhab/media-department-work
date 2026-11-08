@@ -26,8 +26,8 @@ export const ALL_PERMISSIONS = Object.keys(PERMISSION_LABELS) as AppPermission[]
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
   ADMIN: [...ALL_PERMISSIONS],
-  MANAGER: ['view_management_dashboard','create_work_log','view_own_work_logs','view_department_work_logs','view_assignments','manage_assignments','review_assignments','view_projects','manage_projects','view_circulars','manage_circulars','track_circulars','view_notifications','view_department_reports','receive_missing_work_alerts','manage_users'],
-  DEPUTY: ['view_management_dashboard','create_work_log','view_own_work_logs','view_department_work_logs','view_assignments','manage_assignments','review_assignments','view_projects','manage_projects','view_circulars','manage_circulars','track_circulars','view_notifications','view_department_reports','receive_missing_work_alerts','manage_users'],
+  MANAGER: ['view_management_dashboard','create_work_log','view_own_work_logs','view_department_work_logs','view_assignments','manage_assignments','review_assignments','view_projects','manage_projects','view_circulars','manage_circulars','track_circulars','view_notifications','view_department_reports','receive_missing_work_alerts','manage_users','manage_work_exceptions'],
+  DEPUTY: ['view_management_dashboard','create_work_log','view_own_work_logs','view_department_work_logs','view_assignments','manage_assignments','review_assignments','view_projects','manage_projects','view_circulars','manage_circulars','track_circulars','view_notifications','view_department_reports','receive_missing_work_alerts','manage_users','manage_work_exceptions'],
   EMPLOYEE: ['view_employee_dashboard','create_work_log','view_own_work_logs','view_assignments','view_projects','view_circulars','view_notifications','view_own_exceptions','view_own_report'],
 };
 

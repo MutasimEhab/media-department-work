@@ -5,6 +5,9 @@ import helmet from 'helmet';
 import { db } from './db.js';
 import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
+import workDateExceptionsRouter from './routes/work-date-exceptions.js';
+import workLogsRouter from './routes/work-logs.js';
+import assignmentsRouter from './routes/assignments.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -17,6 +20,9 @@ app.use(express.json({ limit: '1mb' }));
 
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/work-date-exceptions', workDateExceptionsRouter);
+app.use('/api/work-logs', workLogsRouter);
+app.use('/api/assignments', assignmentsRouter);
 
 app.get('/api/health', async (_request, response) => {
   try {

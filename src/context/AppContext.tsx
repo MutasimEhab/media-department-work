@@ -45,10 +45,12 @@ interface AppContextType {
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
   acknowledgeCircular: (circularId: string, userId: string) => void;
-  addWorkLog: (log: Omit<WorkLog, 'id'>) => void;
-  saveTask: (task: Task) => void;
-  sendTask: (task: Task) => void;
-  updateTask: (taskId: string, update: (task: Task) => Task) => void;
+  addWorkLog: (log: Omit<WorkLog, 'id'>) => Promise<{ ok: boolean; message?: string }>;
+  updateWorkLog: (id: string, update: Partial<WorkLog>) => Promise<{ ok: boolean; message?: string }>;
+  deleteWorkLog: (id: string) => Promise<{ ok: boolean; message?: string }>;
+  saveTask: (task: Task) => Promise<{ ok: boolean; message?: string }>;
+  sendTask: (task: Task) => Promise<{ ok: boolean; message?: string }>;
+  updateTask: (taskId: string, update: (task: Task) => Task) => Promise<{ ok: boolean; message?: string }>;
   updateProjects: (update: (projects: Project[]) => Project[]) => void;
   saveCircular: (circular: Circular, publish: boolean) => void;
   updateUser: (user: User) => boolean;
@@ -136,6 +138,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setExceptions([]);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/work-date-exceptions', { credentials: 'include' })
+      .then(async response => {
+        if (!response.ok) return null;
+        return await response.json() as { exceptions?: WorkDateException[] };
+      })
+      .then(payload => {
+        if (!cancelled && payload?.exceptions) setExceptions(payload.exceptions);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [isAuthenticated, currentUser.id]);
+
   const [users, setUsers] = useState<User[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('official_users') || '[]') as User[];
@@ -174,6 +194,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch { return MOCK_NOTIFICATIONS; }
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    fetch('/api/work-logs/mine', { credentials: 'include' })
+      .then(async response => {
+        if (!response.ok) return null;
+        return await response.json() as { workLogs?: WorkLog[] };
+      })
+      .then(payload => {
+        if (!cancelled && payload?.workLogs) {
+          setWorkLogs(previous => [
+            ...payload.workLogs!,
+            ...previous.filter(log => log.userId !== currentUser.id),
+          ]);
+        }
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [isAuthenticated, currentUser.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    Promise.all([
+      fetch('/api/assignments', { credentials: 'include' }),
+      fetch('/api/users', { credentials: 'include' }),
+    ]).then(async ([assignmentResponse, userResponse]) => {
+      const [assignmentPayload, userPayload] = await Promise.all([
+        assignmentResponse.json() as Promise<{ tasks?: Task[]; message?: string }>,
+        userResponse.json() as Promise<{ users?: BackendUser[] }>,
+      ]);
+      if (cancelled) return;
+      if (assignmentResponse.ok && assignmentPayload.tasks) setTasks(assignmentPayload.tasks);
+      if (userResponse.ok && userPayload.users) setUsers(userPayload.users.map(mapBackendUser));
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [isAuthenticated, currentUser.id]);
 
   // The approved product interface is Arabic-only. Keep this compatibility
   // method for older components, but never switch the application locale.
@@ -303,12 +361,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const addWorkLog = (logData: Omit<WorkLog, 'id'>) => {
-    const newLog: WorkLog = {
-      ...logData,
-      id: `LOG-${400 + workLogs.length + 1}`,
-    };
-    setWorkLogs(prev => [newLog, ...prev]);
+  const addWorkLog = async (logData: Omit<WorkLog, 'id'>) => {
+    try {
+      const response = await fetch('/api/work-logs', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: logData.userId,
+          workDate: logData.date,
+          area: logData.area,
+          workMode: logData.location,
+          description: logData.activityAr,
+          outputLink: logData.outputLink,
+        }),
+      });
+      const payload = await response.json() as { workLog?: WorkLog; message?: string };
+      if (!response.ok || !payload.workLog) return { ok: false, message: payload.message || 'تعذر حفظ سجل العمل.' };
+      setWorkLogs(previous => [payload.workLog!, ...previous.filter(log => log.id !== payload.workLog!.id)]);
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحفظ سجل العمل.' };
+    }
+  };
+
+  const updateWorkLog = async (id: string, update: Partial<WorkLog>) => {
+    try {
+      const response = await fetch(`/api/work-logs/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          area: update.area,
+          workMode: update.location,
+          description: update.activityAr,
+          outputLink: update.outputLink || '',
+        }),
+      });
+      const payload = await response.json() as { workLog?: WorkLog; message?: string };
+      if (!response.ok || !payload.workLog) return { ok: false, message: payload.message || 'تعذر تعديل السجل.' };
+      setWorkLogs(previous => previous.map(log => log.id === id ? payload.workLog! : log));
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُعدّل السجل.' };
+    }
+  };
+
+  const deleteWorkLog = async (id: string) => {
+    try {
+      const response = await fetch(`/api/work-logs/${encodeURIComponent(id)}`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      const payload = await response.json() as { message?: string };
+      if (!response.ok) return { ok: false, message: payload.message || 'تعذر حذف السجل.' };
+      setWorkLogs(previous => previous.filter(log => log.id !== id));
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحذف السجل.' };
+    }
   };
 
   const queueWorkLog = (logData: Omit<WorkLog, 'id'>) => {
@@ -327,31 +437,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => window.removeEventListener('online', sync);
   }, [pendingWork]);
 
-  const saveTask = (task: Task) => {
-    setTasks(prev => prev.some(t => t.id === task.id) ? prev.map(t => t.id === task.id ? task : t) : [...prev, task]);
-    if (task.isDraft) {
-      try {
-        const drafts = JSON.parse(localStorage.getItem('demo_task_drafts') || '[]') as Task[];
-        localStorage.setItem('demo_task_drafts', JSON.stringify([...drafts.filter(t => t.id !== task.id), task]));
-      } catch { /* storage may be unavailable; current session still retains the draft */ }
+  const persistTask = async (task: Task) => {
+    try {
+      const response = await fetch(task.id.match(/^[0-9a-f]{8}-/i) ? `/api/assignments/${encodeURIComponent(task.id)}` : '/api/assignments', {
+        method: task.id.match(/^[0-9a-f]{8}-/i) ? 'PUT' : 'POST',
+        credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titleAr: task.titleAr, descriptionAr: task.descriptionAr, priority: task.priority,
+          type: task.type, deadline: task.deadline, isDraft: task.isDraft,
+          assigneeIds: task.recipients.map(recipient => recipient.userId),
+          referenceUrl: task.referenceUrl, reminderOptions: task.reminderOptions,
+          emailDelivery: task.emailDelivery, smsDelivery: task.smsDelivery,
+        }),
+      });
+      const payload = await response.json() as { task?: Task; message?: string };
+      if (!response.ok || !payload.task) return { ok: false, message: payload.message || 'تعذر حفظ التكليف.' };
+      setTasks(previous => previous.some(existing => existing.id === payload.task!.id)
+        ? previous.map(existing => existing.id === payload.task!.id ? payload.task! : existing)
+        : [payload.task!, ...previous]);
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحفظ التكليف.' };
     }
   };
+  const saveTask = (task: Task) => persistTask({ ...task, isDraft: true });
 
-  const sendTask = (task: Task) => {
-    if (notifications.some(n => n.type === 'TASK_ASSIGNED' && n.actionUrl.endsWith(task.id))) return;
+  const sendTask = async (task: Task) => {
+    const result = await persistTask({ ...task, isDraft: false });
+    if (!result.ok) return result;
     const sent = { ...task, isDraft: false };
-    setTasks(prev => prev.some(t => t.id === sent.id) ? prev.map(t => t.id === sent.id ? sent : t) : [...prev, sent]);
-    const newItems: NotificationItem[] = sent.recipients.map((recipient, index) => ({
-      id: `NTF-DEMO-${sent.id}-${recipient.userId}`, userId: recipient.userId, type: 'TASK_ASSIGNED',
+    const newItems: NotificationItem[] = sent.recipients.map(recipient => ({
+      id: `NTF-${sent.id}-${recipient.userId}`, userId: recipient.userId, type: 'TASK_ASSIGNED',
       titleAr: 'تكليف عمل جديد', titleEn: 'New assignment',
-      messageAr: `تم إسناد تكليف جديد إليك (${sent.id}).`, messageEn: `A new assignment was sent to you (${sent.id}).`,
-      timestamp: '2026-10-31 09:15 AM', isRead: false, actionUrl: `/app/assignments/${sent.id}`,
+      messageAr: `تم إسناد تكليف جديد: ${sent.titleAr}.`, messageEn: `A new assignment was sent: ${sent.titleAr}.`,
+      timestamp: new Date().toISOString(), isRead: false, actionUrl: `/app/assignments/${sent.id}`,
     }));
-    setNotifications(prev => [...newItems.filter(n => !prev.some(old => old.id === n.id)), ...prev]);
-    try { localStorage.setItem('demo_task_drafts', JSON.stringify((JSON.parse(localStorage.getItem('demo_task_drafts') || '[]') as Task[]).filter(t => t.id !== sent.id))); } catch { /* current session remains authoritative */ }
+    setNotifications(previous => [...newItems.filter(item => !previous.some(old => old.id === item.id)), ...previous]);
+    return { ok: true };
   };
-  const updateTask = (taskId: string, update: (task: Task) => Task) => {
-    setTasks(prev => prev.map(task => task.id === taskId ? update(task) : task));
+  const updateTask = async (taskId: string, update: (task: Task) => Task) => {
+    const existing = tasks.find(task => task.id === taskId);
+    if (!existing) return { ok: false, message: 'التكليف غير موجود.' };
+    const updated = update(existing);
+    const changedRecipient = updated.recipients.find(recipient => {
+      const previous = existing.recipients.find(item => item.userId === recipient.userId);
+      return previous && JSON.stringify(previous) !== JSON.stringify(recipient);
+    });
+    if (changedRecipient && /^[0-9a-f]{8}-/i.test(taskId)) {
+      try {
+        const response = await fetch(`/api/assignments/${encodeURIComponent(taskId)}/recipients/${encodeURIComponent(changedRecipient.userId)}`, {
+          method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: changedRecipient.status,
+            submissionLinks: changedRecipient.submissionLinks || (changedRecipient.submissionLink ? [changedRecipient.submissionLink] : []),
+            submissionNote: changedRecipient.submissionNote,
+            reviewNote: changedRecipient.reviewNote,
+          }),
+        });
+        const payload = await response.json() as { message?: string };
+        if (!response.ok) return { ok: false, message: payload.message || 'تعذر حفظ تحديث التكليف.' };
+      } catch {
+        return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحفظ تحديث التكليف.' };
+      }
+    }
+    setTasks(previous => previous.map(task => task.id === taskId ? updated : task));
+    return { ok: true };
   };
   const updateProjects = (update: (current: Project[]) => Project[]) => {
     setProjects(prev => update(prev));
@@ -435,6 +585,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markAllNotificationsAsRead,
         acknowledgeCircular,
         addWorkLog,
+        updateWorkLog,
+        deleteWorkLog,
         saveTask,
         sendTask,
         updateTask,
