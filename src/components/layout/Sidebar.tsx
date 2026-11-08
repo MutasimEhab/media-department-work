@@ -186,13 +186,13 @@ export const Sidebar: React.FC = () => {
       >
         {/* Navigation Links */}
         <nav className="flex-1 overflow-y-auto p-3 pt-4 space-y-1">
-          {allowedAdminNav.length > 0 && <section className="mb-2 border-b border-brand-border pb-2" aria-label="لوحة الإدارة">
+          {allowedNav.map(renderNavItem)}
+          {allowedAdminNav.length > 0 && <section className="mt-2 border-t border-brand-border pt-2" aria-label="لوحة الإدارة">
             <button type="button" aria-expanded={adminMenuOpen} aria-controls="admin-navigation-items" onClick={() => setAdminMenuOpen(value => !value)} className={`flex min-h-[46px] w-full items-center justify-between rounded-input px-3 py-2.5 text-sm font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-brand-plum ${allowedAdminNav.some(item => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)) ? 'bg-brand-magenta text-white' : 'text-brand-charcoal hover:bg-brand-lightGray/70'}`}>
               <span className="flex items-center gap-3"><Shield className="h-5 w-5"/>لوحة الإدارة</span><ChevronDown className={`h-4 w-4 transition-transform ${adminMenuOpen ? 'rotate-180' : ''}`}/>
             </button>
             {adminMenuOpen && <div id="admin-navigation-items" className="mt-1 space-y-1 border-e-2 border-brand-plum/20 pe-2">{allowedAdminNav.map(renderNavItem)}</div>}
           </section>}
-          {allowedNav.map(renderNavItem)}
         </nav>
 
         {/* Footer info */}
