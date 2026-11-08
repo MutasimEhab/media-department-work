@@ -128,6 +128,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (cancelled || !payload?.user) return;
         setCurrentUser(mapBackendUser(payload.user));
         setIsAuthenticated(true);
+        setWelcomeGreetingOpen(true);
       })
       .catch(() => undefined)
       .finally(() => { if (!cancelled) setIsAuthLoading(false); });

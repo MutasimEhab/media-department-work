@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Wifi, WifiOff, Search, Sun, Moon, Shield, Users, BriefcaseBusiness, CalendarDays, FileText, BarChart3, Settings, Activity, Database, CloudUpload, PackageCheck } from 'lucide-react';
+import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Wifi, WifiOff, Search, Sun, Moon } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import organizationLogo from '../../assets/brand/organization-logo.png';
-import { AppPermission } from '../../auth/permissions';
-import { UserRole } from '../../types';
 
 export const Topbar: React.FC = () => {
   const {
@@ -30,13 +28,14 @@ export const Topbar: React.FC = () => {
     t,
   } = useApp();
 
-  const [openMenu, setOpenMenu] = useState<'notifications' | 'user' | 'admin' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'notifications' | 'user' | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const location = useLocation();
   useEscapeKey(openMenu !== null, () => setOpenMenu(null));
   useEscapeKey(searchOpen, () => { setSearchOpen(false); setSearchQuery(''); });
+  useEscapeKey(welcomeGreetingOpen, dismissWelcomeGreeting);
   useEffect(() => setOpenMenu(null), [location.pathname]);
   useEffect(() => {
     const online = () => setIsOnline(true);
@@ -46,21 +45,6 @@ export const Topbar: React.FC = () => {
     return () => { window.removeEventListener('online', online); window.removeEventListener('offline', offline); };
   }, []);
   const navigate = useNavigate();
-  const adminMenuItems: { to: string; label: string; icon: React.ReactNode; roles: UserRole[]; permission: AppPermission }[] = [
-    { to: '/app/admin/add-work', label: 'إضافة عمل لموظف', icon: <BriefcaseBusiness size={17}/>, roles: ['ADMIN'], permission: 'create_work_log' },
-    { to: '/app/admin/work-date-exceptions', label: 'استثناءات التسجيل', icon: <CalendarDays size={17}/>, roles: ['ADMIN'], permission: 'manage_work_exceptions' },
-    { to: '/app/admin/records', label: 'الكشوفات والتصدير', icon: <BarChart3 size={17}/>, roles: ['ADMIN'], permission: 'view_department_reports' },
-    { to: '/app/users', label: t.nav.users, icon: <Users size={17}/>, roles: ['ADMIN', 'MANAGER', 'DEPUTY'], permission: 'manage_users' },
-    { to: '/app/admin/account-types', label: 'أنواع الحسابات', icon: <PackageCheck size={17}/>, roles: ['ADMIN'], permission: 'manage_system_settings' },
-    { to: '/app/admin/workflow', label: 'إعداد سير العمل', icon: <Activity size={17}/>, roles: ['ADMIN'], permission: 'manage_system_settings' },
-    { to: '/app/settings', label: t.nav.settings, icon: <Settings size={17}/>, roles: ['ADMIN'], permission: 'manage_system_settings' },
-    { to: '/app/admin/custom-fields', label: 'الخانات الإضافية', icon: <Database size={17}/>, roles: ['ADMIN'], permission: 'manage_system_settings' },
-    { to: '/app/audit-log', label: t.nav.audit, icon: <Shield size={17}/>, roles: ['ADMIN'], permission: 'view_audit_log' },
-    { to: '/app/system-health', label: t.nav.health, icon: <Activity size={17}/>, roles: ['ADMIN'], permission: 'view_system_health' },
-    { to: '/app/admin/backup', label: 'النسخ الاحتياطي', icon: <CloudUpload size={17}/>, roles: ['ADMIN'], permission: 'manage_system_settings' },
-  ];
-  const adminLinks = adminMenuItems.filter(item => item.roles.includes(currentUser.role) && canAccess(item.permission));
-
   const userNotifications = notifications.filter(n => n.userId === currentUser.id);
   const searchResults = useMemo(() => {
     const term = searchQuery.trim().toLocaleLowerCase('ar');
@@ -87,10 +71,6 @@ export const Topbar: React.FC = () => {
 
       {/* End: Controls (Language, Notifications, User) */}
       <div className="flex items-center gap-1 sm:gap-2">
-        {adminLinks.length > 0 && <div className="relative">
-          <button type="button" onClick={() => { setOpenMenu(openMenu === 'admin' ? null : 'admin'); setSearchOpen(false); }} aria-label="لوحة الإدارة" aria-expanded={openMenu === 'admin'} className="flex min-h-10 items-center gap-1.5 rounded-input px-2.5 text-xs font-bold text-brand-plum hover:bg-brand-lightGray focus:outline-none focus:ring-2 focus:ring-brand-plum sm:px-3 sm:text-sm"><Shield size={17}/><span className="hidden sm:inline">لوحة الإدارة</span><ChevronDown size={14}/></button>
-          {openMenu === 'admin' && <div className="absolute end-0 z-50 mt-2 max-h-[70vh] w-64 overflow-y-auto rounded-card border border-brand-border bg-white p-2 shadow-dialog" role="menu" aria-label="قائمة لوحة الإدارة"><p className="px-3 py-2 text-xs font-bold text-brand-plum">إدارة النظام</p>{adminLinks.map(item=><Link key={item.to} role="menuitem" to={item.to} onClick={()=>setOpenMenu(null)} className="flex min-h-10 items-center gap-3 rounded-input px-3 py-2 text-sm text-brand-darkText hover:bg-brand-lightGray focus:outline-none focus:ring-2 focus:ring-brand-plum"><span className="text-brand-plum">{item.icon}</span>{item.label}</Link>)}</div>}
-        </div>}
         <button
           type="button"
           onClick={toggleSidebar}
@@ -202,9 +182,6 @@ export const Topbar: React.FC = () => {
               <span className="max-w-40 truncate text-xs font-bold text-brand-darkText">
                 {language === 'ar' ? currentUser.arabicName : currentUser.englishName}
               </span>
-              <span className="max-w-48 truncate text-[10px] text-brand-charcoal/70">
-                {currentUser.jobTitleAr || t.roles[currentUser.role]} · الرقم الوظيفي: <bdi dir="ltr">{currentUser.employeeNumber || '—'}</bdi>
-              </span>
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-brand-charcoal/70 hidden md:inline-block" />
           </button>
@@ -214,7 +191,6 @@ export const Topbar: React.FC = () => {
               <div className="px-3 py-2 border-b border-brand-border/60">
                 <p className="text-xs font-bold text-brand-darkText">{language === 'ar' ? currentUser.arabicName : currentUser.englishName}</p>
                 <p className="text-[11px] text-brand-charcoal/70 truncate">{currentUser.email}</p>
-                <p className="text-[11px] text-brand-charcoal/70 truncate">{currentUser.jobTitleAr || t.roles[currentUser.role]} · الرقم الوظيفي: <bdi dir="ltr">{currentUser.employeeNumber || '—'}</bdi></p>
                 <span className="inline-block mt-1 text-[10px] bg-brand-plum/10 text-brand-plum font-semibold px-2 py-0.5 rounded">
                   {t.roles[currentUser.role]}
                 </span>
@@ -249,7 +225,7 @@ export const Topbar: React.FC = () => {
           )}
         </div>
       </div>
-      {welcomeGreetingOpen && <div className="fixed end-4 top-20 z-[60] w-[min(92vw,24rem)] animate-in slide-in-from-top-3 fade-in rounded-card border border-brand-border bg-white p-4 shadow-dialog" role="status"><div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-plum text-lg font-bold text-white">{currentUser.avatar?<img src={currentUser.avatar} alt="" className="h-full w-full object-cover"/>:currentUser.arabicName.charAt(0)}</div><div className="min-w-0 flex-1"><p className="font-bold text-brand-darkText">أهلاً وسهلاً، {currentUser.arabicName}!</p><p className="mt-1 text-sm text-brand-charcoal">نتمنى لك يوم عمل موفقاً. ابدأ من هنا:</p><Link to={currentUser.role==='EMPLOYEE'?'/app/work/new':'/app/assignments'} onClick={dismissWelcomeGreeting} className="mt-2 inline-flex rounded-input bg-brand-magenta px-3 py-2 text-xs font-bold text-white hover:brightness-110">{currentUser.role==='EMPLOYEE'?'سجّل عملك اليومي':'تابع التكليفات'}</Link></div><button type="button" onClick={dismissWelcomeGreeting} className="rounded p-1 text-brand-charcoal hover:bg-brand-lightGray" aria-label="إغلاق رسالة الترحيب">×</button></div></div>}
+      {welcomeGreetingOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-brand-darkText/55 p-4 backdrop-blur-sm" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="welcome-heading" className="relative w-full max-w-lg animate-in zoom-in-95 fade-in rounded-2xl border border-brand-border bg-white p-6 text-center shadow-dialog sm:p-9"><button type="button" onClick={dismissWelcomeGreeting} className="absolute end-3 top-3 rounded-lg p-2 text-brand-charcoal hover:bg-brand-lightGray" aria-label="إغلاق رسالة الترحيب">×</button><div className="mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-4 border-brand-plum/15 bg-brand-plum text-3xl font-bold text-white shadow-subtle">{currentUser.avatar?<img src={currentUser.avatar} alt="" className="h-full w-full object-cover"/>:currentUser.arabicName.charAt(0)}</div><p className="mt-5 text-sm font-semibold text-brand-plum">بوابة أعمال دائرة الإعلام</p><h2 id="welcome-heading" className="mt-2 text-2xl font-bold text-brand-darkText sm:text-3xl">أهلاً وسهلاً، {currentUser.arabicName}</h2><p className="mx-auto mt-3 max-w-sm text-sm leading-7 text-brand-charcoal">نتمنى لك يوماً موفقاً. يمكنك البدء مباشرة من الإجراء المناسب لحسابك.</p><Link to={currentUser.role==='EMPLOYEE'?'/app/work/new':'/app/assignments'} onClick={dismissWelcomeGreeting} className="mt-6 inline-flex min-h-12 items-center justify-center rounded-input bg-brand-magenta px-6 py-3 text-sm font-bold text-white shadow-subtle transition hover:-translate-y-0.5 hover:brightness-110">{currentUser.role==='EMPLOYEE'?'ابدأ بتسجيل عملك اليومي':'افتح التكليفات والمتابعة'}</Link></section></div>}
       {searchOpen && <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 px-3 pt-[12vh]" onMouseDown={event => { if (event.target === event.currentTarget) { setSearchOpen(false); setSearchQuery(''); } }}>
         <section role="dialog" aria-modal="true" aria-label="بحث شامل" className="w-full max-w-2xl overflow-hidden rounded-2xl border border-brand-border bg-white shadow-dialog">
           <div className="flex items-center gap-3 border-b border-brand-border px-4 py-3"><Search size={20} className="shrink-0 text-brand-plum" /><input autoFocus value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="ابحث في التكليفات والمشاريع والتعاميم وسجلات العمل" className="min-h-11 flex-1 border-0 bg-transparent text-sm outline-none" /><button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} aria-label="إغلاق البحث" className="rounded p-2 text-brand-charcoal hover:bg-brand-lightGray">×</button></div>
