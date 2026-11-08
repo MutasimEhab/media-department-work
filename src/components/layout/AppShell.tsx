@@ -5,6 +5,7 @@ import { Topbar } from './Topbar';
 import { DemoBanner } from './DemoBanner';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { EnglishDigits } from '../ui/EnglishDigits';
 
 export const AppShell: React.FC = () => {
   const { isAuthenticated, isAuthLoading, theme } = useApp();
@@ -13,6 +14,7 @@ export const AppShell: React.FC = () => {
   if (!isAuthenticated) return <Navigate to="/auth/login" replace state={{ from: location.pathname }} />;
   return (
     <div className={`${theme === 'dark' ? 'app-theme-dark' : 'app-theme-light'} min-h-screen bg-brand-lightGray text-brand-darkText flex flex-col`}>
+      <EnglishDigits />
       <DemoBanner />
       <Topbar />
       <div className="flex min-h-0 flex-1">

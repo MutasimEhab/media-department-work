@@ -8,15 +8,10 @@ import {
   Bell,
   BarChart3,
   BriefcaseBusiness,
-  Users,
-  Settings,
-  ShieldAlert,
-  Activity,
   User,
   CalendarCheck,
-  PackageCheck,
   CloudUpload,
-  Database,
+  PackageCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
@@ -132,22 +127,7 @@ export const Sidebar: React.FC = () => {
     },
   ];
 
-  const adminNavItems: NavItem[] = [
-    { to: '/app/admin/add-work', label: 'إضافة عمل لموظف', icon: <BriefcaseBusiness className="w-5 h-5" />, roles: ['ADMIN'], permission: 'create_work_log' },
-    { to: '/app/admin/work-date-exceptions', label: 'استثناءات التسجيل', icon: <CalendarCheck className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_work_exceptions' },
-    { to: '/app/admin/records', label: 'الكشوفات والتصدير', icon: <BarChart3 className="w-5 h-5" />, roles: ['ADMIN'], permission: 'view_department_reports' },
-    { to: '/app/users', label: t.nav.users, icon: <Users className="w-5 h-5" />, roles: ['ADMIN', 'MANAGER', 'DEPUTY'], permission: 'manage_users' },
-    { to: '/app/admin/account-types', label: 'أنواع الحسابات', icon: <PackageCheck className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
-    { to: '/app/admin/workflow', label: 'إعداد سير العمل', icon: <Activity className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
-    { to: '/app/settings', label: t.nav.settings, icon: <Settings className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
-    { to: '/app/admin/custom-fields', label: 'الخانات الإضافية', icon: <Database className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
-    { to: '/app/audit-log', label: t.nav.audit, icon: <ShieldAlert className="w-5 h-5" />, roles: ['ADMIN'], permission: 'view_audit_log' },
-    { to: '/app/system-health', label: t.nav.health, icon: <Activity className="w-5 h-5" />, roles: ['ADMIN'], permission: 'view_system_health' },
-    { to: '/app/admin/backup', label: 'النسخ الاحتياطي', icon: <CloudUpload className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
-  ];
-
   const allowedNav = navItems.filter(item => !item.permission || canAccess(item.permission));
-  const allowedAdminNav = adminNavItems.filter(item => item.roles.includes(role) && (!item.permission || canAccess(item.permission)));
   const renderNavItem = (item: NavItem) => {
     const isWorkHistory = item.to === '/app/work' && location.pathname.startsWith('/app/work/') && !['/app/work/new','/app/work/pending'].includes(location.pathname);
     const isActive = location.pathname === item.to || isWorkHistory || (!['/app/work', '/app/work/new'].includes(item.to) && location.pathname.startsWith(`${item.to}/`));
@@ -179,10 +159,6 @@ export const Sidebar: React.FC = () => {
         {/* Navigation Links */}
         <nav className="flex-1 overflow-y-auto p-3 pt-4 space-y-1">
           {allowedNav.map(renderNavItem)}
-          {allowedAdminNav.length > 0 && <section className="mt-3 space-y-1 border-t border-brand-border pt-3" aria-label="لوحة الإدارة">
-            <h2 className="px-3 pb-1 text-xs font-bold text-brand-plum">لوحة الإدارة</h2>
-            {allowedAdminNav.map(renderNavItem)}
-          </section>}
         </nav>
 
         {/* Footer info */}

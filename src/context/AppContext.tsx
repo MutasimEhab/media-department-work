@@ -24,6 +24,8 @@ interface AppContextType {
   login: (identifier: string, password: string) => Promise<{ ok: boolean; code?: string; user?: User }>;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
+  welcomeGreetingOpen: boolean;
+  dismissWelcomeGreeting: () => void;
   signOut: () => void;
   users: User[];
   tasks: Task[];
@@ -69,6 +71,7 @@ interface BackendUser {
   role: UserRole;
   jobTitleAr: string;
   employeeNumber?: string;
+  avatar?: string;
   email: string;
   mobile?: string;
   isActive: boolean;
@@ -85,6 +88,7 @@ function mapBackendUser(user: BackendUser): User {
     role: user.role,
     jobTitleAr: user.jobTitleAr,
     employeeNumber: user.employeeNumber,
+    avatar: user.avatar,
     jobTitleEn: user.jobTitleAr,
     email: user.email,
     mobile: user.mobile,
@@ -104,6 +108,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [welcomeGreetingOpen, setWelcomeGreetingOpen] = useState(false);
   // Keep a harmless fallback for pages such as sign-in; AppShell blocks every internal route until authentication.
   const [currentUser, setCurrentUser] = useState<User>(() => {
     try {
@@ -253,6 +258,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const user = mapBackendUser(payload.user);
       setCurrentUser(user);
       setIsAuthenticated(true);
+      setWelcomeGreetingOpen(true);
       return { ok: true, user };
     } catch {
       return { ok: false, code: 'LOGIN_UNAVAILABLE' };
@@ -405,6 +411,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         login,
         isAuthenticated,
         isAuthLoading,
+        welcomeGreetingOpen,
+        dismissWelcomeGreeting: () => setWelcomeGreetingOpen(false),
         signOut,
         users,
         tasks,

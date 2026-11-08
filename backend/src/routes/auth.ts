@@ -20,6 +20,7 @@ interface UserRow {
   job_title_ar: string;
   mobile: string | null;
   employee_number: string | null;
+  avatar_data: string | null;
   is_active: boolean;
   department_id: string | null;
   department_name_ar: string | null;
@@ -74,7 +75,7 @@ function clearSessionCookie(response: Response): void {
 async function findUser(identifier: string): Promise<UserRow | undefined> {
   const result = await db.query<UserRow>(
     `SELECT u.id, u.username, u.email, u.password_hash, u.full_name_ar,
-            u.job_title_ar, u.mobile, u.employee_number, u.is_active, u.department_id,
+            u.job_title_ar, u.mobile, u.employee_number, u.avatar_data, u.is_active, u.department_id,
             d.name_ar AS department_name_ar, u.role_code
        FROM users u
        LEFT JOIN departments d ON d.id = u.department_id
@@ -120,6 +121,7 @@ function publicUser(user: UserRow) {
     email: user.email,
     mobile: user.mobile ?? undefined,
     employeeNumber: user.employee_number ?? undefined,
+    avatar: user.avatar_data ?? undefined,
     isActive: user.is_active,
     departmentId: user.department_id ?? undefined,
     departmentAr: user.department_name_ar ?? '',

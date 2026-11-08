@@ -20,6 +20,7 @@ function publicUser(row: Record<string, unknown>) {
     role: codeToRole[String(row.role_code)] ?? 'EMPLOYEE',
     jobTitleAr: row.job_title_ar,
     employeeNumber: row.employee_number ?? undefined,
+    avatar: row.avatar_data ?? undefined,
     email: row.email,
     mobile: row.mobile ?? undefined,
     isActive: row.is_active,
@@ -61,6 +62,45 @@ router.get('/departments', async (_request, response) => {
     'SELECT id, name_ar FROM departments ORDER BY name_ar',
   );
   response.json({ departments: result.rows.map((row) => ({ id: row.id, nameAr: row.name_ar })) });
+});
+
+router.patch('/me/profile', async (request: AuthenticatedRequest, response) => {
+  const fullNameAr = typeof request.body?.arabicName === 'string' ? request.body.arabicName.trim() : '';
+  const mobile = typeof request.body?.mobile === 'string' ? request.body.mobile.trim() : '';
+  const avatar = request.body?.avatar;
+  if (!fullNameAr || fullNameAr.length > 120 || mobile.length > 40
+    || (avatar !== null && avatar !== undefined && (typeof avatar !== 'string'
+      || avatar.length > 350_000
+      || !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(avatar)))) {
+    response.status(400).json({ message: 'تحقق من الاسم ورقم الاتصال والصورة؛ حجم الصورة يجب أن يكون صغيراً.' });
+    return;
+  }
+  try {
+    const updated = await db.query(
+      `UPDATE users SET full_name_ar = $2, mobile = $3,
+          avatar_data = CASE WHEN $4::boolean THEN $5 ELSE avatar_data END,
+          updated_at = now()
+        WHERE id = $1
+        RETURNING id, username, email, full_name_ar, job_title_ar, employee_number,
+                  avatar_data, mobile, role_code, is_active, department_id, last_login_at`,
+      [request.authUser!.id, fullNameAr, mobile || null, avatar !== undefined, avatar ?? null],
+    );
+    if (!updated.rowCount) {
+      response.status(404).json({ message: 'الحساب غير موجود.' });
+      return;
+    }
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, 'user.own_profile.update', 'users', $2, $3::jsonb)`,
+      [request.authUser!.id, request.authUser!.id, JSON.stringify({ hasAvatar: avatar !== undefined })],
+    );
+    const department = await db.query<{ name_ar: string }>(
+      'SELECT name_ar FROM departments WHERE id = $1', [updated.rows[0].department_id],
+    );
+    response.json({ user: publicUser({ ...updated.rows[0], department_name_ar: department.rows[0]?.name_ar ?? '' }) });
+  } catch {
+    response.status(503).json({ message: 'تعذر حفظ الملف الشخصي حالياً.' });
+  }
 });
 
 router.patch('/:userId/status', async (request: AuthenticatedRequest, response) => {
