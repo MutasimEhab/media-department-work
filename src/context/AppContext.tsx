@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
 import { User, Task, Project, Circular, WorkLog, NotificationItem, UserRole, WorkDateException } from '../types';
 import {
   MOCK_USERS,
@@ -109,6 +109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [welcomeGreetingOpen, setWelcomeGreetingOpen] = useState(false);
+  const dismissWelcomeGreeting = useCallback(() => setWelcomeGreetingOpen(false), []);
   // Keep a harmless fallback for pages such as sign-in; AppShell blocks every internal route until authentication.
   const [currentUser, setCurrentUser] = useState<User>(() => {
     try {
@@ -413,7 +414,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthenticated,
         isAuthLoading,
         welcomeGreetingOpen,
-        dismissWelcomeGreeting: () => setWelcomeGreetingOpen(false),
+        dismissWelcomeGreeting,
         signOut,
         users,
         tasks,

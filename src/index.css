@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes welcome-progress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+.welcome-progress {
+  transform-origin: right;
+  animation: welcome-progress 7s linear forwards;
+}
+
 @font-face {
   font-family: 'Advertising ExtraBold';
   src: url('./assets/brand/fonts/AdvertisingExtraBold.ttf') format('truetype');
