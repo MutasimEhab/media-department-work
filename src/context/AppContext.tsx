@@ -51,7 +51,7 @@ interface AppContextType {
   saveTask: (task: Task) => Promise<{ ok: boolean; message?: string }>;
   sendTask: (task: Task) => Promise<{ ok: boolean; message?: string }>;
   updateTask: (taskId: string, update: (task: Task) => Task) => Promise<{ ok: boolean; message?: string }>;
-  updateProjects: (update: (projects: Project[]) => Project[]) => void;
+  updateProjects: (update: (projects: Project[]) => Project[]) => Promise<{ ok: boolean; message?: string }>;
   saveCircular: (circular: Circular, publish: boolean) => void;
   updateUser: (user: User) => boolean;
   addUser: (user: User) => boolean;
@@ -221,14 +221,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     Promise.all([
       fetch('/api/assignments', { credentials: 'include' }),
       fetch('/api/users', { credentials: 'include' }),
-    ]).then(async ([assignmentResponse, userResponse]) => {
-      const [assignmentPayload, userPayload] = await Promise.all([
+      fetch('/api/projects', { credentials: 'include' }),
+    ]).then(async ([assignmentResponse, userResponse, projectResponse]) => {
+      const [assignmentPayload, userPayload, projectPayload] = await Promise.all([
         assignmentResponse.json() as Promise<{ tasks?: Task[]; message?: string }>,
         userResponse.json() as Promise<{ users?: BackendUser[] }>,
+        projectResponse.json() as Promise<{ projects?: Project[]; message?: string }>,
       ]);
       if (cancelled) return;
       if (assignmentResponse.ok && assignmentPayload.tasks) setTasks(assignmentPayload.tasks);
       if (userResponse.ok && userPayload.users) setUsers(userPayload.users.map(mapBackendUser));
+      if (projectResponse.ok && projectPayload.projects) setProjects(projectPayload.projects);
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [isAuthenticated, currentUser.id]);
@@ -503,8 +506,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTasks(previous => previous.map(task => task.id === taskId ? updated : task));
     return { ok: true };
   };
-  const updateProjects = (update: (current: Project[]) => Project[]) => {
-    setProjects(prev => update(prev));
+  const updateProjects = async (update: (current: Project[]) => Project[]) => {
+    const next = update(projects);
+    const created = next.find(project => !projects.some(existing => existing.id === project.id));
+    const changed = next.find(project => {
+      const existing = projects.find(item => item.id === project.id);
+      return existing && JSON.stringify(existing) !== JSON.stringify(project);
+    });
+    const project = created || changed;
+    if (!project) return { ok: true };
+    const body = {
+      titleAr: project.titleAr, descriptionAr: project.descriptionAr, ownerId: project.ownerId,
+      status: project.status, startDate: project.startedAt || '', expectedEndDate: project.expectedEndDate || '',
+      relatedTaskId: project.relatedTaskId || '',
+      stages: project.stages.map(stage => ({ ...stage, titleAr: stage.titleAr, dueDate: stage.dueDate || '' })),
+    };
+    try {
+      const response = await fetch(created ? '/api/projects' : `/api/projects/${encodeURIComponent(project.id)}`, {
+        method: created ? 'POST' : 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      const payload = await response.json() as { project?: Project; message?: string };
+      if (!response.ok || (created && !payload.project)) {
+        const message = payload.message || 'تعذر حفظ المشروع.';
+        window.alert(message);
+        return { ok: false, message };
+      }
+      setProjects(created
+        ? [payload.project!, ...projects]
+        : next);
+      return { ok: true };
+    } catch {
+      const message = 'تعذر الاتصال بالخادم؛ لم يُحفظ المشروع.';
+      window.alert(message);
+      return { ok: false, message };
+    }
   };
   const saveCircular = (circular: Circular, publish: boolean) => {
     setCirculars(prev => prev.some(c => c.id === circular.id) ? prev.map(c => c.id === circular.id ? circular : c) : [circular, ...prev]);

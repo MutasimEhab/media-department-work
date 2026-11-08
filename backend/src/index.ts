@@ -8,6 +8,7 @@ import usersRouter from './routes/users.js';
 import workDateExceptionsRouter from './routes/work-date-exceptions.js';
 import workLogsRouter from './routes/work-logs.js';
 import assignmentsRouter from './routes/assignments.js';
+import projectsRouter from './routes/projects.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -23,6 +24,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/work-date-exceptions', workDateExceptionsRouter);
 app.use('/api/work-logs', workLogsRouter);
 app.use('/api/assignments', assignmentsRouter);
+app.use('/api/projects', projectsRouter);
 
 app.get('/api/health', async (_request, response) => {
   try {

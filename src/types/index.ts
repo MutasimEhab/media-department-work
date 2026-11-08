@@ -83,6 +83,7 @@ export interface Project {
   ownerId: string;
   ownerNameAr: string;
   ownerNameEn: string;
+  memberIds?: string[];
   status: 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD' | 'CLOSED';
   expectedEndDate?: string;
   startedAt?: string;
