@@ -11,13 +11,13 @@
 
 ## إعداد المشروع في لوحة Vercel
 
-1. افتح `https://vercel.com/new` وسجّل الدخول، ثم اختر **Import Git Repository**.
-2. استورد `MutasimEhab/media-department-work` واختر فرع `codex/neon-node-backend`.
-3. اترك **Root Directory** على جذر المشروع، واختر إطار Express إذا طُلب ذلك؛ الإعداد موجود أيضاً في `vercel.json`.
-4. تأكد أن أمر التثبيت والبناء مأخوذان من `vercel.json`، ثم أنشئ **Preview Deployment** من دون إضافة `DATABASE_URL` في هذه المرحلة.
-5. بعد تجهيز نسخة قاعدة بيانات تجريبية منفصلة والتحقق من خطة الاستضافة، أضف `DATABASE_URL` في Vercel → Project → Settings → Environment Variables لبيئة Preview فقط أولاً.
-6. أضف `NODE_ENV=production` إلى بيئة Preview، ثم أعد النشر. افحص `/api/health` وتسجيل الدخول بحسابات تجريبية فقط.
-7. لا تنشئ Production Deployment ولا تربط قاعدة الموظفين الحقيقية قبل تأكيد موافقة المؤسسة على الاستضافة، والخطة المناسبة، ونسخة الاستعادة.
+1. قبل النشر جهّز قاعدة Neon **اختبارية منفصلة** بمخطط التطبيق وحسابات اختبار فقط؛ لا تستخدم فرعاً منسوخاً من قاعدة الموظفين.
+2. افتح `https://vercel.com/new` وسجّل الدخول، ثم اختر **Import Git Repository**.
+3. استورد `MutasimEhab/media-department-work` واختر فرع `codex/neon-node-backend`.
+4. اترك **Root Directory** على جذر المشروع، واختر إطار Express إذا طُلب ذلك؛ الإعداد موجود أيضاً في `vercel.json`.
+5. قبل أول نشر، أضف في إعدادات Environment Variables لبيئة Preview فقط: `DATABASE_URL` لرابط قاعدة الاختبار و`NODE_ENV=production`. لا تضع رابط قاعدة الموظفين الحقيقية.
+6. تأكد أن أوامر التثبيت والبناء مأخوذة من `vercel.json`، ثم أنشئ Preview Deployment. افحص `/api/health` وسجّل الدخول بحسابات الاختبار.
+7. لا تنشر Production ولا تربط قاعدة الموظفين الحقيقية قبل تأكيد موافقة المؤسسة على الاستضافة، والخطة المناسبة، وإنشاء نسخة احتياطية مستقلة وتجربة استعادتها.
 
 ## المتغيرات السرية
 
