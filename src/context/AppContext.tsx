@@ -42,8 +42,8 @@ interface AppContextType {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
-  markNotificationAsRead: (id: string) => void;
-  markAllNotificationsAsRead: () => void;
+  markNotificationAsRead: (id: string) => Promise<void>;
+  markAllNotificationsAsRead: () => Promise<void>;
   acknowledgeCircular: (circularId: string, userId: string) => Promise<{ ok: boolean; message?: string }>;
   addWorkLog: (log: Omit<WorkLog, 'id'>) => Promise<{ ok: boolean; message?: string }>;
   updateWorkLog: (id: string, update: Partial<WorkLog>) => Promise<{ ok: boolean; message?: string }>;
@@ -224,18 +224,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       fetch('/api/users', { credentials: 'include' }),
       fetch('/api/projects', { credentials: 'include' }),
       fetch('/api/circulars', { credentials: 'include' }),
-    ]).then(async ([assignmentResponse, userResponse, projectResponse, circularResponse]) => {
-      const [assignmentPayload, userPayload, projectPayload, circularPayload] = await Promise.all([
+      fetch('/api/notifications', { credentials: 'include' }),
+    ]).then(async ([assignmentResponse, userResponse, projectResponse, circularResponse, notificationResponse]) => {
+      const [assignmentPayload, userPayload, projectPayload, circularPayload, notificationPayload] = await Promise.all([
         assignmentResponse.json() as Promise<{ tasks?: Task[]; message?: string }>,
         userResponse.json() as Promise<{ users?: BackendUser[] }>,
         projectResponse.json() as Promise<{ projects?: Project[]; message?: string }>,
         circularResponse.json() as Promise<{ circulars?: Circular[] }>,
+        notificationResponse.json() as Promise<{ notifications?: NotificationItem[] }>,
       ]);
       if (cancelled) return;
       if (assignmentResponse.ok && assignmentPayload.tasks) setTasks(assignmentPayload.tasks);
       if (userResponse.ok && userPayload.users) setUsers(userPayload.users.map(mapBackendUser));
       if (projectResponse.ok && projectPayload.projects) setProjects(projectPayload.projects);
       if (circularResponse.ok && circularPayload.circulars) setCirculars(circularPayload.circulars);
+      if (notificationResponse.ok && notificationPayload.notifications) {
+        setNotifications(previous => {
+          const persistedIds = new Set(notificationPayload.notifications!.map(item => item.id));
+          return [...notificationPayload.notifications!, ...previous.filter(item => item.userId !== currentUser.id || !persistedIds.has(item.id))];
+        });
+      }
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [isAuthenticated, currentUser.id]);
@@ -340,16 +348,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const userNotifications = notifications.filter(n => n.userId === currentUser.id);
   const unreadNotificationCount = userNotifications.filter(n => !n.isRead).length;
 
-  const markNotificationAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(item => (item.id === id ? { ...item, isRead: true } : item))
-    );
+  const markNotificationAsRead = async (id: string) => {
+    const notification = notifications.find(item => item.id === id && item.userId === currentUser.id);
+    if (!notification) return;
+    if (!notification.id.startsWith('NTF-')) {
+      try {
+        const response = await fetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH', credentials: 'include' });
+        if (!response.ok) throw new Error('notification update failed');
+      } catch {
+        window.alert('تعذر حفظ حالة الإشعار.');
+        return;
+      }
+    }
+    setNotifications(prev => prev.map(item => item.id === id ? { ...item, isRead: true } : item));
   };
 
-  const markAllNotificationsAsRead = () => {
-    setNotifications(prev =>
-      prev.map(item => (item.userId === currentUser.id ? { ...item, isRead: true } : item))
-    );
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const response = await fetch('/api/notifications/read-all', { method: 'POST', credentials: 'include' });
+      if (!response.ok) throw new Error('notification update failed');
+    } catch {
+      window.alert('تعذر حفظ حالة الإشعارات.');
+      return;
+    }
+    setNotifications(prev => prev.map(item => item.userId === currentUser.id ? { ...item, isRead: true } : item));
   };
 
   const acknowledgeCircular = async (circularId: string, userId: string) => {
@@ -570,16 +592,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       setCirculars(previous => [payload.circular!, ...previous.filter(item => item.id !== payload.circular!.id)]);
       if (publish) {
-        const newItems: NotificationItem[] = payload.circular.recipients.map(recipient => ({
-          id: `NTF-CIR-${payload.circular!.id}-${recipient.userId}`,
-          userId: recipient.userId,
-          type: 'CIRCULAR_PUBLISHED',
-          titleAr: 'تعميم جديد', titleEn: 'New circular',
-          messageAr: payload.circular!.titleAr, messageEn: payload.circular!.titleAr,
-          timestamp: payload.circular!.issuedAt, isRead: false,
-          actionUrl: `/app/circulars/${payload.circular!.id}`,
-        }));
-        setNotifications(previous => [...newItems.filter(item => !previous.some(existing => existing.id === item.id)), ...previous]);
+        try {
+          const notificationResponse = await fetch('/api/notifications', { credentials: 'include' });
+          if (notificationResponse.ok) {
+            const notificationPayload = await notificationResponse.json() as { notifications?: NotificationItem[] };
+            if (notificationPayload.notifications) {
+              setNotifications(previous => [
+                ...notificationPayload.notifications!,
+                ...previous.filter(item => item.userId !== currentUser.id || !notificationPayload.notifications!.some(saved => saved.id === item.id)),
+              ]);
+            }
+          }
+        } catch { /* the published circular is already saved; notifications reload at next sign-in */ }
       }
       return { ok: true, circular: payload.circular };
     } catch {
