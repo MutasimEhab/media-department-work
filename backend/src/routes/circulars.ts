@@ -50,15 +50,22 @@ router.use(requireAuth);
 
 router.get('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
+  const mayViewDepartment = actor.roleCode === 'system_admin'
+    || (['department_manager', 'deputy_manager'].includes(actor.roleCode)
+      && (request.permissions?.includes('view_circulars') || request.permissions?.includes('manage_circulars')
+        || request.permissions?.includes('track_circulars')));
+  if (!mayViewDepartment && !request.permissions?.includes('view_circulars')) {
+    response.status(403).json({ message: 'لا تملك صلاحية عرض التعاميم.' });
+    return;
+  }
   try {
     const result = await db.query(
       `${circularSelect}
-       WHERE ($1::text = 'system_admin'
-              OR ($1::text IN ('department_manager', 'deputy_manager') AND c.department_id = $2)
+       WHERE ($1::text = 'system_admin' OR ($4::boolean AND c.department_id = $2)
               OR c.issued_by = $3
               OR cr.user_id = $3)
        ORDER BY COALESCE(c.published_at, c.created_at) DESC, recipient.full_name_ar`,
-      [actor.roleCode, actor.departmentId, actor.id],
+      [actor.roleCode, actor.departmentId, actor.id, mayViewDepartment],
     );
     response.json({ circulars: mapCircularRows(result.rows) });
   } catch {
@@ -68,7 +75,7 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
 
 async function saveCircular(request: AuthenticatedRequest, response: import('express').Response, id?: string) {
   const actor = request.authUser!;
-  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('circulars.create_department')) {
+  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('manage_circulars')) {
     response.status(403).json({ message: 'لا تملك صلاحية إنشاء التعاميم.' });
     return;
   }
@@ -184,6 +191,10 @@ router.put('/:circularId', (request: AuthenticatedRequest, response) => {
 
 router.patch('/:circularId/acknowledge', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
+  if (!request.permissions?.includes('view_circulars')) {
+    response.status(403).json({ message: 'لا تملك صلاحية عرض التعاميم.' });
+    return;
+  }
   const id = request.params.circularId;
   const circularId = Array.isArray(id) ? id[0] : id;
   try {
@@ -214,7 +225,7 @@ router.post('/:circularId/recipients/:userId/reminder', async (request: Authenti
   const uId = request.params.userId;
   const circularId = Array.isArray(cId) ? cId[0] : cId;
   const userId = Array.isArray(uId) ? uId[0] : uId;
-  const manager = actor.roleCode === 'system_admin' || request.permissions?.includes('circulars.create_department');
+  const manager = actor.roleCode === 'system_admin' || request.permissions?.includes('track_circulars');
   if (!manager) {
     response.status(403).json({ message: 'لا تملك صلاحية متابعة مستلمي التعميم.' });
     return;

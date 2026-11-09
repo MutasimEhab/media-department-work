@@ -10,7 +10,7 @@ import {
   FROZEN_DEMO_DATE,
 } from '../data/mockData';
 import { translations, Language } from '../i18n/translations';
-import { ALL_PERMISSIONS, AppPermission, DEFAULT_ROLE_PERMISSIONS, roleHasPermission, RolePermissionOverrides } from '../auth/permissions';
+import { AppPermission, DEFAULT_ROLE_PERMISSIONS, roleHasPermission, RolePermissionOverrides } from '../auth/permissions';
 
 export type DisplayTheme = 'light' | 'dark';
 
@@ -58,7 +58,7 @@ interface AppContextType {
   addUser: (user: User) => boolean;
   canAccess: (permission: AppPermission) => boolean;
   rolePermissions: RolePermissionOverrides;
-  updateRolePermission: (role: UserRole, permission: AppPermission, enabled: boolean) => void;
+  updateRolePermission: (role: UserRole, permission: AppPermission, enabled: boolean) => Promise<boolean>;
   exceptions: WorkDateException[];
   addException: (exception: WorkDateException) => void;
   revokeException: (id: string) => void;
@@ -173,20 +173,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => { cancelled = true; };
   }, [isAuthenticated, currentUser.id]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    fetch('/api/role-permissions', { credentials: 'include' })
+      .then(async response => {
+        const payload = await response.json() as { rolePermissions?: RolePermissionOverrides };
+        if (!response.ok) return null;
+        return payload.rolePermissions;
+      })
+      .then(permissions => { if (!cancelled && permissions) setRolePermissions(permissions); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [isAuthenticated, currentUser.id]);
+
   const [users, setUsers] = useState<User[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('official_users') || '[]') as User[];
       return [...MOCK_USERS.filter(user => !saved.some(entry => entry.id === user.id)), ...saved];
     } catch { return MOCK_USERS; }
   });
-  const [rolePermissions, setRolePermissions] = useState<RolePermissionOverrides>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('official_role_permissions') || '{}') as RolePermissionOverrides;
-      return Object.fromEntries(Object.entries(saved).map(([role, permissions]) => [
-        role,
-        Array.isArray(permissions) ? permissions.filter(permission => ALL_PERMISSIONS.includes(permission as AppPermission)) : [],
-      ])) as RolePermissionOverrides;
-    } catch { return {}; }
+  const [rolePermissions, setRolePermissions] = useState<RolePermissionOverrides>({
+    MANAGER: [...DEFAULT_ROLE_PERMISSIONS.MANAGER],
+    DEPUTY: [...DEFAULT_ROLE_PERMISSIONS.DEPUTY],
+    EMPLOYEE: [...DEFAULT_ROLE_PERMISSIONS.EMPLOYEE],
   });
   const [exceptions, setExceptions] = useState<WorkDateException[]>(() => { try { return JSON.parse(localStorage.getItem('demo_work_exceptions')||'[]') as WorkDateException[]; } catch { return []; } });
   const [tasks, setTasks] = useState<Task[]>(() => {
@@ -656,17 +666,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   const addUser = (user:User) => { if(users.some(u=>u.email.toLowerCase()===user.email.toLowerCase()||Boolean(user.username&&u.username?.toLowerCase()===user.username.toLowerCase())))return false;setUsers(prev=>[...prev,user]);return true; };
   const canAccess = (permission: AppPermission) => roleHasPermission(currentUser.role, permission, rolePermissions);
-  const updateRolePermission = (role: UserRole, permission: AppPermission, enabled: boolean) => {
-    if (currentUser.role !== 'ADMIN' || role === 'ADMIN') return;
-    setRolePermissions(previous => {
-      const current = previous[role] || [...DEFAULT_ROLE_PERMISSIONS[role]];
-      const nextForRole = enabled
-        ? [...new Set([...current, permission])]
-        : current.filter(item => item !== permission);
-      const next = { ...previous, [role]: nextForRole };
-      try { localStorage.setItem('official_role_permissions', JSON.stringify(next)); } catch { /* current session still applies */ }
-      return next;
-    });
+  const updateRolePermission = async (role: UserRole, permission: AppPermission, enabled: boolean) => {
+    if (currentUser.role !== 'ADMIN' || role === 'ADMIN') return false;
+    const current = rolePermissions[role] || [...DEFAULT_ROLE_PERMISSIONS[role]];
+    const nextPermissions = enabled
+      ? [...new Set([...current, permission])]
+      : current.filter(item => item !== permission);
+    try {
+      const response = await fetch(`/api/role-permissions/${encodeURIComponent(role)}`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissionCodes: nextPermissions }),
+      });
+      const payload = await response.json() as { message?: string };
+      if (!response.ok) throw new Error(payload.message || 'تعذر حفظ الصلاحية.');
+      setRolePermissions(previous => ({ ...previous, [role]: nextPermissions }));
+      return true;
+    } catch (cause) {
+      window.alert(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم؛ لم تُحفظ الصلاحية.');
+      return false;
+    }
   };
   const addException = (exception: WorkDateException) => {
     setExceptions(prev=>{const next=[exception,...prev];try{localStorage.setItem('demo_work_exceptions',JSON.stringify(next));}catch{}return next;});

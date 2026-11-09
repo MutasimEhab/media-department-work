@@ -40,18 +40,24 @@ router.use(requireAuth);
 
 router.get('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
+  const mayViewDepartment = actor.roleCode === 'system_admin'
+    || (['department_manager', 'deputy_manager'].includes(actor.roleCode)
+      && (request.permissions?.includes('view_projects') || request.permissions?.includes('manage_projects')));
+  if (!mayViewDepartment && !request.permissions?.includes('view_projects')) {
+    response.status(403).json({ message: 'لا تملك صلاحية عرض المشاريع.' });
+    return;
+  }
   try {
     const result = await db.query(
       `SELECT p.id, p.title_ar, p.description_ar, p.status, p.start_date, p.expected_end_date,
               p.assignment_id, p.owner_id, owner.full_name_ar AS owner_name,
               COALESCE((SELECT json_agg(pm.user_id) FROM project_members pm WHERE pm.project_id = p.id), '[]'::json) AS member_ids
          FROM projects p JOIN users owner ON owner.id = p.owner_id
-        WHERE ($1::text = 'system_admin'
-               OR ($1::text IN ('department_manager', 'deputy_manager') AND p.department_id = $2)
+        WHERE ($1::text = 'system_admin' OR ($4::boolean AND p.department_id = $2)
                OR p.owner_id = $3
                OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $3))
         ORDER BY p.updated_at DESC, p.created_at DESC`,
-      [actor.roleCode, actor.departmentId, actor.id],
+      [actor.roleCode, actor.departmentId, actor.id, mayViewDepartment],
     );
     const projectIds = result.rows.map(row => row.id);
     const stages = projectIds.length ? await db.query(
@@ -68,7 +74,7 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
 
 router.post('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
-  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('projects.create_department')) {
+  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('manage_projects')) {
     response.status(403).json({ message: 'لا تملك صلاحية إنشاء مشروع.' });
     return;
   }
@@ -170,7 +176,7 @@ router.patch('/:projectId', async (request: AuthenticatedRequest, response) => {
       return;
     }
     const manager = actor.roleCode === 'system_admin'
-      || (actor.departmentId === project.department_id && request.permissions?.includes('projects.create_department'));
+      || (actor.departmentId === project.department_id && request.permissions?.includes('manage_projects'));
     const owner = actor.id === project.owner_id;
     if (!manager && !owner) {
       await client.query('ROLLBACK');

@@ -37,6 +37,7 @@ export const SystemSettings: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savingRolePermission, setSavingRolePermission] = useState(false);
   const [error, setError] = useState('');
   const [section, setSection] = useState<'organization'|'work'|'scoring'|'reminders'|'security'|'permissions'>('organization');
   const weightTotal = settings.weights.completion + settings.weights.timeliness + settings.weights.communication;
@@ -97,13 +98,15 @@ export const SystemSettings: React.FC = () => {
 
     {section === 'permissions' ? <>
       <Card title="مصفوفة الصلاحيات حسب الدور">
-        <p className="mb-4 text-sm text-brand-charcoal">تُطبّق التغييرات فورًا على القوائم ومسارات الصفحات في هذه النسخة. تعديل المصفوفة متاح لمسؤول النظام فقط، وصلاحيات مسؤول النظام ثابتة لضمان بقاء إدارة النظام متاحة.</p>
+        <p className="mb-4 text-sm text-brand-charcoal">تُحفظ التغييرات في قاعدة البيانات ويطبقها الخادم على طلبات الحسابات. تعديل المصفوفة متاح لمدير النظام فقط، وصلاحياته ثابتة لضمان بقاء إدارة النظام متاحة.</p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-sm">
             <thead><tr className="border-b border-brand-border text-start"><th className="p-3 text-start">الصلاحية</th>{ROLES.map(role=><th key={role.id} className="p-3 text-center">{role.label}</th>)}</tr></thead>
             <tbody>{ALL_PERMISSIONS.map(permission=><tr key={permission} className="border-b border-brand-border/70"><th className="p-3 text-start font-medium">{PERMISSION_LABELS[permission]}</th>{ROLES.map(role=>{
               const enabled = role.id==='ADMIN' || (rolePermissions[role.id] || DEFAULT_ROLE_PERMISSIONS[role.id]).includes(permission);
-              return <td key={role.id} className="p-3 text-center"><input type="checkbox" aria-label={`${PERMISSION_LABELS[permission]} — ${role.label}`} checked={enabled} disabled={role.id==='ADMIN'||currentUser.role!=='ADMIN'} onChange={event=>updateRolePermission(role.id,permission as AppPermission,event.target.checked)} className="h-4 w-4 accent-fuchsia-700 disabled:opacity-60"/></td>;
+              const adminOnly = ['manage_system_settings','view_audit_log','view_system_health'].includes(permission);
+              const employeeRestricted = role.id==='EMPLOYEE'&&['view_management_dashboard','view_department_work_logs','view_department_reports','manage_users','manage_work_exceptions'].includes(permission);
+              return <td key={role.id} className="p-3 text-center"><input type="checkbox" aria-label={`${PERMISSION_LABELS[permission]} — ${role.label}`} checked={enabled} disabled={savingRolePermission||role.id==='ADMIN'||currentUser.role!=='ADMIN'||adminOnly||employeeRestricted} onChange={async event=>{setSavingRolePermission(true);await updateRolePermission(role.id,permission as AppPermission,event.target.checked);setSavingRolePermission(false)}} className="h-4 w-4 accent-fuchsia-700 disabled:opacity-60"/></td>;
             })}</tr>)}</tbody>
           </table>
         </div>

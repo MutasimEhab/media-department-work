@@ -21,6 +21,10 @@ function mapNotification(row: Record<string, any>) {
 }
 
 router.get('/', async (request: AuthenticatedRequest, response) => {
+  if (!request.permissions?.includes('view_notifications')) {
+    response.status(403).json({ message: 'لا تملك صلاحية عرض الإشعارات.' });
+    return;
+  }
   try {
     const result = await db.query(
       `SELECT id, user_id, type, title_ar, body_ar, action_url, read_at, created_at
@@ -34,6 +38,10 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
 });
 
 router.patch('/:notificationId/read', async (request: AuthenticatedRequest, response) => {
+  if (!request.permissions?.includes('view_notifications')) {
+    response.status(403).json({ message: 'لا تملك صلاحية تحديث الإشعارات.' });
+    return;
+  }
   const id = request.params.notificationId;
   try {
     const result = await db.query(
@@ -52,6 +60,10 @@ router.patch('/:notificationId/read', async (request: AuthenticatedRequest, resp
 });
 
 router.post('/read-all', async (request: AuthenticatedRequest, response) => {
+  if (!request.permissions?.includes('view_notifications')) {
+    response.status(403).json({ message: 'لا تملك صلاحية تحديث الإشعارات.' });
+    return;
+  }
   try {
     const result = await db.query(
       'UPDATE notifications SET read_at = COALESCE(read_at, now()) WHERE user_id = $1 AND read_at IS NULL',

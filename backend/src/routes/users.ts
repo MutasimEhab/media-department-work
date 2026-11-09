@@ -11,6 +11,17 @@ const roleToCode = {
   EMPLOYEE: 'employee',
 } as const;
 const codeToRole = Object.fromEntries(Object.entries(roleToCode).map(([role, code]) => [code, role])) as Record<string, keyof typeof roleToCode>;
+const appPermissionCodes = [
+  'view_management_dashboard','view_employee_dashboard','create_work_log','view_own_work_logs','manage_own_work_logs',
+  'view_department_work_logs','view_assignments','manage_assignments','review_assignments','view_projects','manage_projects',
+  'view_circulars','manage_circulars','track_circulars','view_notifications','receive_missing_work_alerts',
+  'view_own_exceptions','view_own_report','view_department_reports','manage_users','manage_system_settings',
+  'manage_work_exceptions','view_audit_log','view_system_health',
+];
+const protectedUserPermissions = new Set([
+  'manage_users','manage_system_settings','manage_work_exceptions','view_department_work_logs',
+  'view_department_reports','view_audit_log','view_system_health',
+]);
 
 function publicUser(row: Record<string, unknown>) {
   return {
@@ -32,7 +43,7 @@ function publicUser(row: Record<string, unknown>) {
 
 function canManageUsers(request: AuthenticatedRequest): boolean {
   return request.authUser?.roleCode === 'system_admin'
-    || Boolean(request.permissions?.includes('users.create_employee'));
+    || Boolean(request.permissions?.includes('manage_users'));
 }
 
 function routeUserId(request: AuthenticatedRequest): string {
@@ -50,6 +61,7 @@ async function findManageableTarget(request: AuthenticatedRequest, userId: strin
   const actor = request.authUser!;
   const allowed = actor.roleCode === 'system_admin'
     || (['department_manager', 'deputy_manager'].includes(actor.roleCode)
+      && Boolean(request.permissions?.includes('manage_users'))
       && target.role_code === 'employee'
       && target.department_id === actor.departmentId);
   return { target, allowed };
@@ -266,12 +278,12 @@ router.get('/:userId/permissions', async (request: AuthenticatedRequest, respons
        FROM permissions p
        LEFT JOIN role_permissions rp ON rp.permission_code = p.code AND rp.role_code = $1
        LEFT JOIN user_permission_overrides upo ON upo.permission_code = p.code AND upo.user_id = $2
-      ORDER BY p.name_ar`,
-    [target.role_code, target.id],
+      WHERE p.code = ANY($3::text[]) ORDER BY p.name_ar`,
+    [target.role_code, target.id, appPermissionCodes],
   );
   const restricted = request.authUser!.roleCode !== 'system_admin';
   const permissions = result.rows.filter((permission) => !restricted
-    || !['users.', 'permissions.', 'system.'].some((prefix) => permission.code.startsWith(prefix)));
+    || !protectedUserPermissions.has(permission.code));
   response.json({ permissions });
 });
 
@@ -291,11 +303,9 @@ router.put('/:userId/permissions', async (request: AuthenticatedRequest, respons
     return;
   }
   const requested = [...new Set(request.body.permissionCodes as string[])];
-  const result = await db.query<{ code: string }>('SELECT code FROM permissions');
-  const known = new Set(result.rows.map((row) => row.code));
   const restricted = request.authUser!.roleCode !== 'system_admin';
-  const forbidden = requested.some((code) => !known.has(code)
-    || (restricted && ['users.', 'permissions.', 'system.'].some((prefix) => code.startsWith(prefix))));
+  const forbidden = requested.some((code) => !appPermissionCodes.includes(code)
+    || (restricted && protectedUserPermissions.has(code)));
   if (forbidden || target.role_code === 'system_admin') {
     response.status(400).json({ message: 'لا يمكن منح هذه الصلاحية لهذا الحساب.' });
     return;
@@ -306,10 +316,10 @@ router.put('/:userId/permissions', async (request: AuthenticatedRequest, respons
     await client.query('BEGIN');
     await client.query(
       `INSERT INTO user_permission_overrides (user_id, permission_code, is_granted, changed_by)
-       SELECT $1, p.code, p.code = ANY($2::text[]), $3 FROM permissions p
+       SELECT $1, p.code, p.code = ANY($2::text[]), $3 FROM permissions p WHERE p.code = ANY($4::text[])
        ON CONFLICT (user_id, permission_code) DO UPDATE
          SET is_granted = EXCLUDED.is_granted, changed_by = EXCLUDED.changed_by, changed_at = now()`,
-      [target.id, requested, request.authUser!.id],
+      [target.id, requested, request.authUser!.id, appPermissionCodes],
     );
     await client.query(
       `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
@@ -378,8 +388,8 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
   const actorIsAdmin = actor.roleCode === 'system_admin';
   const allowed = actorIsAdmin
-    || (actor.roleCode === 'department_manager' && ['deputy_manager', 'employee'].includes(targetRole))
-    || (actor.roleCode === 'deputy_manager' && targetRole === 'employee');
+    || (actor.roleCode === 'department_manager' && request.permissions?.includes('manage_users') && ['deputy_manager', 'employee'].includes(targetRole))
+    || (actor.roleCode === 'deputy_manager' && request.permissions?.includes('manage_users') && targetRole === 'employee');
   if (!allowed) {
     response.status(403).json({ message: 'لا تملك صلاحية إنشاء هذا الدور.' });
     return;

@@ -3,7 +3,7 @@ import { db } from '../db.js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/require-auth.js';
 
 const router = Router();
-const MANAGE_PERMISSION = 'work_exceptions.manage_department';
+const MANAGE_PERMISSION = 'manage_work_exceptions';
 
 function canManage(request: AuthenticatedRequest): boolean {
   return request.authUser?.roleCode === 'system_admin'
@@ -28,7 +28,10 @@ router.use(requireAuth);
 
 router.get('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
-  if (actor.roleCode !== 'system_admin' && actor.roleCode !== 'employee' && !canManage(request)) {
+  if (actor.roleCode !== 'system_admin'
+    && (actor.roleCode === 'employee'
+      ? !request.permissions?.includes('view_own_exceptions')
+      : !canManage(request))) {
     response.status(403).json({ message: 'لا تملك صلاحية عرض استثناءات العمل.' });
     return;
   }

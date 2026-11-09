@@ -64,6 +64,14 @@ router.use(requireAuth);
 
 router.get('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
+  const mayViewDepartment = actor.roleCode === 'system_admin'
+    || (['department_manager', 'deputy_manager'].includes(actor.roleCode)
+      && (request.permissions?.includes('view_assignments') || request.permissions?.includes('manage_assignments')
+        || request.permissions?.includes('review_assignments')));
+  if (!mayViewDepartment && !request.permissions?.includes('view_assignments')) {
+    response.status(403).json({ message: 'لا تملك صلاحية عرض التكليفات.' });
+    return;
+  }
   try {
     const result = await db.query(
       `SELECT a.id, a.created_by, a.title_ar, a.description_ar, a.priority, a.kind, a.status,
@@ -80,12 +88,12 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
          LEFT JOIN users assignee ON assignee.id = aa.user_id
          LEFT JOIN users reviewer ON reviewer.id = aa.reviewed_by
         WHERE ($1::text = 'system_admin'
-               OR ($1::text IN ('department_manager', 'deputy_manager') AND a.department_id = $2)
+               OR ($4::boolean AND a.department_id = $2)
                OR aa.user_id = $3)
           AND (a.status <> 'draft' OR a.created_by = $3
-               OR ($1::text IN ('system_admin', 'department_manager', 'deputy_manager') AND a.department_id = $2))
+               OR ($4::boolean AND a.department_id = $2))
         ORDER BY a.created_at DESC, aa.created_at ASC`,
-      [actor.roleCode, actor.departmentId, actor.id],
+      [actor.roleCode, actor.departmentId, actor.id, mayViewDepartment],
     );
     response.json({ tasks: mapRows(result.rows) });
   } catch {
@@ -95,7 +103,7 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
 
 async function saveAssignment(request: AuthenticatedRequest, response: import('express').Response, id?: string) {
   const actor = request.authUser!;
-  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('assignments.create_department')) {
+  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('manage_assignments')) {
     response.status(403).json({ message: 'لا تملك صلاحية إنشاء التكليفات أو إدارتها.' });
     return;
   }
@@ -282,7 +290,7 @@ router.patch('/:assignmentId/recipients/:userId', async (request: AuthenticatedR
     const isOwner = actor.id === targetUserId && actor.roleCode === 'employee';
     const canReview = actor.roleCode === 'system_admin'
       || (actor.departmentId === recipient.department_id
-        && request.permissions?.includes('assignments.create_department'));
+        && request.permissions?.includes('review_assignments'));
     const ownerTransition = (nextStatus === 'IN_PROGRESS' && ['assigned', 'received'].includes(recipient.current_status))
       || (nextStatus === 'SUBMITTED'
         && ['in_progress', 'returned', 'returned_for_revision'].includes(recipient.current_status) && links.length > 0);

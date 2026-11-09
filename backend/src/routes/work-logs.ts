@@ -51,6 +51,10 @@ function mapWorkLog(row: Record<string, any>) {
 router.use(requireAuth);
 
 router.get('/mine', async (request: AuthenticatedRequest, response) => {
+  if (!request.permissions?.includes('view_own_work_logs')) {
+    response.status(403).json({ message: 'لا تملك صلاحية عرض سجل العمل الشخصي.' });
+    return;
+  }
   try {
     const result = await db.query(
       `SELECT log.id, log.user_id, log.work_date, log.work_nature, log.work_region,
@@ -69,7 +73,7 @@ router.get('/mine', async (request: AuthenticatedRequest, response) => {
 
 router.get('/department', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
-  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('work_logs.read_department')) {
+  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('view_department_work_logs')) {
     response.status(403).json({ message: 'سجلات الموظفين متاحة للقراءة لمدير النظام ومدير الدائرة ونائبه.' });
     return;
   }
@@ -90,7 +94,7 @@ router.get('/department', async (request: AuthenticatedRequest, response) => {
 
 router.post('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
-  if (!request.permissions?.includes('work_logs.create_own')) {
+  if (!request.permissions?.includes('create_work_log')) {
     response.status(403).json({ message: 'لا تملك صلاحية تسجيل العمل من هذا الحساب.' });
     return;
   }
@@ -149,7 +153,7 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
 
 router.patch('/:logId', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
-  if (!request.permissions?.includes('work_logs.manage_own')) {
+  if (!request.permissions?.includes('manage_own_work_logs')) {
     response.status(403).json({ message: 'تعديل سجل العمل متاح لصاحبه فقط.' });
     return;
   }
@@ -198,7 +202,7 @@ router.patch('/:logId', async (request: AuthenticatedRequest, response) => {
 
 router.delete('/:logId', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
-  if (!request.permissions?.includes('work_logs.manage_own')) {
+  if (!request.permissions?.includes('manage_own_work_logs')) {
     response.status(403).json({ message: 'حذف سجل العمل متاح لصاحبه فقط.' });
     return;
   }
