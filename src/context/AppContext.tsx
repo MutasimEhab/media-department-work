@@ -44,7 +44,7 @@ interface AppContextType {
   toggleSidebar: () => void;
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
-  acknowledgeCircular: (circularId: string, userId: string) => void;
+  acknowledgeCircular: (circularId: string, userId: string) => Promise<{ ok: boolean; message?: string }>;
   addWorkLog: (log: Omit<WorkLog, 'id'>) => Promise<{ ok: boolean; message?: string }>;
   updateWorkLog: (id: string, update: Partial<WorkLog>) => Promise<{ ok: boolean; message?: string }>;
   deleteWorkLog: (id: string) => Promise<{ ok: boolean; message?: string }>;
@@ -52,7 +52,8 @@ interface AppContextType {
   sendTask: (task: Task) => Promise<{ ok: boolean; message?: string }>;
   updateTask: (taskId: string, update: (task: Task) => Task) => Promise<{ ok: boolean; message?: string }>;
   updateProjects: (update: (projects: Project[]) => Project[]) => Promise<{ ok: boolean; message?: string }>;
-  saveCircular: (circular: Circular, publish: boolean) => void;
+  saveCircular: (circular: Circular, publish: boolean) => Promise<{ ok: boolean; circular?: Circular; message?: string }>;
+  recordCircularReminder: (circularId: string, userId: string) => Promise<{ ok: boolean; reminderCount?: number; message?: string }>;
   updateUser: (user: User) => boolean;
   addUser: (user: User) => boolean;
   canAccess: (permission: AppPermission) => boolean;
@@ -222,16 +223,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       fetch('/api/assignments', { credentials: 'include' }),
       fetch('/api/users', { credentials: 'include' }),
       fetch('/api/projects', { credentials: 'include' }),
-    ]).then(async ([assignmentResponse, userResponse, projectResponse]) => {
-      const [assignmentPayload, userPayload, projectPayload] = await Promise.all([
+      fetch('/api/circulars', { credentials: 'include' }),
+    ]).then(async ([assignmentResponse, userResponse, projectResponse, circularResponse]) => {
+      const [assignmentPayload, userPayload, projectPayload, circularPayload] = await Promise.all([
         assignmentResponse.json() as Promise<{ tasks?: Task[]; message?: string }>,
         userResponse.json() as Promise<{ users?: BackendUser[] }>,
         projectResponse.json() as Promise<{ projects?: Project[]; message?: string }>,
+        circularResponse.json() as Promise<{ circulars?: Circular[] }>,
       ]);
       if (cancelled) return;
       if (assignmentResponse.ok && assignmentPayload.tasks) setTasks(assignmentPayload.tasks);
       if (userResponse.ok && userPayload.users) setUsers(userPayload.users.map(mapBackendUser));
       if (projectResponse.ok && projectPayload.projects) setProjects(projectPayload.projects);
+      if (circularResponse.ok && circularPayload.circulars) setCirculars(circularPayload.circulars);
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [isAuthenticated, currentUser.id]);
@@ -348,20 +352,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const acknowledgeCircular = (circularId: string, userId: string) => {
-    setCirculars(prev =>
-      prev.map(cir => {
-        if (cir.id === circularId) {
-          const updatedRecipients = cir.recipients.map(r =>
-            r.userId === userId
-              ? { ...r, hasAcknowledged: true, acknowledgedAt: '09:15 ص' }
-              : r
-          );
-          return { ...cir, recipients: updatedRecipients };
-        }
-        return cir;
-      })
-    );
+  const acknowledgeCircular = async (circularId: string, userId: string) => {
+    try {
+      const response = await fetch(`/api/circulars/${encodeURIComponent(circularId)}/acknowledge`, {
+        method: 'PATCH', credentials: 'include',
+      });
+      const payload = await response.json() as { acknowledgedAt?: string; message?: string };
+      if (!response.ok) return { ok: false, message: payload.message || 'تعذر حفظ إقرار القراءة.' };
+      setCirculars(previous => previous.map(circular => circular.id !== circularId ? circular : {
+        ...circular,
+        recipients: circular.recipients.map(recipient => recipient.userId === userId
+          ? { ...recipient, hasAcknowledged: true, acknowledgedAt: payload.acknowledgedAt }
+          : recipient),
+      }));
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحفظ إقرار القراءة.' };
+    }
   };
 
   const addWorkLog = async (logData: Omit<WorkLog, 'id'>) => {
@@ -542,18 +549,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { ok: false, message };
     }
   };
-  const saveCircular = (circular: Circular, publish: boolean) => {
-    setCirculars(prev => prev.some(c => c.id === circular.id) ? prev.map(c => c.id === circular.id ? circular : c) : [circular, ...prev]);
-    if (publish) {
-      const newItems: NotificationItem[] = circular.recipients.map(r => ({
-        id: `NTF-CIR-${circular.id}-${r.userId}`, userId: r.userId, type: 'CIRCULAR_PUBLISHED',
-        titleAr: 'تعميم جديد', titleEn: 'New circular', messageAr: circular.titleAr, messageEn: circular.titleEn,
-        timestamp: circular.issuedAt, isRead: false, actionUrl: `/app/circulars/${circular.id}`,
+  const saveCircular = async (circular: Circular, publish: boolean) => {
+    try {
+      const isDraftUpdate = !circular.id.startsWith('CIR-') && circulars.some(item => item.id === circular.id && item.isDraft);
+      const response = await fetch(isDraftUpdate ? `/api/circulars/${encodeURIComponent(circular.id)}` : '/api/circulars', {
+        method: isDraftUpdate ? 'PUT' : 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titleAr: circular.titleAr, contentAr: circular.contentAr, targetAudience: circular.targetAudience,
+          recipientIds: circular.recipients.map(recipient => recipient.userId),
+          notifyEmail: circular.emailDelivery, notifySms: circular.smsDelivery,
+          parentId: circular.parentId, publish,
+        }),
+      });
+      const payload = await response.json() as { circular?: Circular; message?: string };
+      if (!response.ok || !payload.circular) {
+        const message = payload.message || 'تعذر حفظ التعميم.';
+        window.alert(message);
+        return { ok: false, message };
+      }
+      setCirculars(previous => [payload.circular!, ...previous.filter(item => item.id !== payload.circular!.id)]);
+      if (publish) {
+        const newItems: NotificationItem[] = payload.circular.recipients.map(recipient => ({
+          id: `NTF-CIR-${payload.circular!.id}-${recipient.userId}`,
+          userId: recipient.userId,
+          type: 'CIRCULAR_PUBLISHED',
+          titleAr: 'تعميم جديد', titleEn: 'New circular',
+          messageAr: payload.circular!.titleAr, messageEn: payload.circular!.titleAr,
+          timestamp: payload.circular!.issuedAt, isRead: false,
+          actionUrl: `/app/circulars/${payload.circular!.id}`,
+        }));
+        setNotifications(previous => [...newItems.filter(item => !previous.some(existing => existing.id === item.id)), ...previous]);
+      }
+      return { ok: true, circular: payload.circular };
+    } catch {
+      const message = 'تعذر الاتصال بالخادم؛ لم يُحفظ التعميم.';
+      window.alert(message);
+      return { ok: false, message };
+    }
+  };
+  const recordCircularReminder = async (circularId: string, userId: string) => {
+    try {
+      const response = await fetch(`/api/circulars/${encodeURIComponent(circularId)}/recipients/${encodeURIComponent(userId)}/reminder`, {
+        method: 'POST', credentials: 'include',
+      });
+      const payload = await response.json() as { reminderCount?: number; message?: string };
+      if (!response.ok || payload.reminderCount === undefined) return { ok: false, message: payload.message || 'تعذر حفظ محاولة التذكير.' };
+      setCirculars(previous => previous.map(circular => circular.id !== circularId ? circular : {
+        ...circular,
+        recipients: circular.recipients.map(recipient => recipient.userId === userId
+          ? { ...recipient, reminderCount: payload.reminderCount }
+          : recipient),
       }));
-      setNotifications(prev => [...newItems.filter(n => !prev.some(p => p.id === n.id)), ...prev]);
-      try { localStorage.setItem('demo_circular_drafts', JSON.stringify((JSON.parse(localStorage.getItem('demo_circular_drafts') || '[]') as Circular[]).filter(c => c.id !== circular.id))); } catch { /* keep session state */ }
-    } else {
-      try { const drafts=JSON.parse(localStorage.getItem('demo_circular_drafts')||'[]') as Circular[];localStorage.setItem('demo_circular_drafts',JSON.stringify([...drafts.filter(c=>c.id!==circular.id),circular])); } catch { /* keep session state */ }
+      return { ok: true, reminderCount: payload.reminderCount };
+    } catch {
+      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم تُحفظ محاولة التذكير.' };
     }
   };
   const updateUser = (user: User) => {
@@ -628,6 +678,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateTask,
         updateProjects,
         saveCircular,
+        recordCircularReminder,
         updateUser,
         addUser,
         canAccess,

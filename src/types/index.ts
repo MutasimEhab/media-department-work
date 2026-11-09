@@ -97,6 +97,7 @@ export interface CircularRecipient {
   userNameEn: string;
   hasAcknowledged: boolean;
   acknowledgedAt?: string; // e.g. "09:05 AM"
+  reminderCount?: number;
 }
 
 export interface Circular {
@@ -109,9 +110,12 @@ export interface Circular {
   issuerNameAr: string;
   issuerNameEn: string;
   issuedAt: string; // e.g. "2026-10-31 08:30 AM"
-  targetAudience: 'EMPLOYEES_ONLY' | 'MANAGEMENT_ONLY' | 'EVERYONE';
+  targetAudience: 'EMPLOYEES_ONLY' | 'MANAGEMENT_ONLY' | 'EVERYONE' | 'SPECIFIC';
   isDraft: boolean;
   recipients: CircularRecipient[];
+  parentId?: string;
+  emailDelivery?: boolean;
+  smsDelivery?: boolean;
 }
 
 export type WorkLocation = 'OFFICE' | 'FIELD';

@@ -17,19 +17,24 @@ export const CircularEditor: React.FC = () => {
   const immutable = Boolean(base && !base.isDraft);
   const [title, setTitle] = useState(base?.isDraft ? base.titleAr : '');
   const [body, setBody] = useState(base?.isDraft ? base.contentAr : '');
-  const [audience, setAudience] = useState<'EVERYONE'|'EMPLOYEES_ONLY'|'SPECIFIC'>('EMPLOYEES_ONLY');
+  const [audience, setAudience] = useState<'EVERYONE'|'EMPLOYEES_ONLY'|'MANAGEMENT_ONLY'|'SPECIFIC'>(base?.isDraft ? base.targetAudience : 'EMPLOYEES_ONLY');
   const [selected, setSelected] = useState<string[]>(base?.isDraft ? base.recipients.map(recipient => recipient.userId) : []);
-  const [email, setEmail] = useState(false);
-  const [sms, setSms] = useState(false);
+  const [email, setEmail] = useState(base?.emailDelivery ?? false);
+  const [sms, setSms] = useState(base?.smsDelivery ?? false);
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
   useEscapeKey(confirm, () => setConfirm(false));
 
   const activeEmployees = users.filter(user => user.isActive && user.role === 'EMPLOYEE');
-  const recipients = audience === 'SPECIFIC' ? selected : activeEmployees.map(user => user.id);
-  const recipientOptions = activeEmployees.map(user => ({ value: user.id, label: ar ? user.arabicName : user.englishName }));
+  const activeUsers = users.filter(user => user.isActive);
+  const recipients = audience === 'SPECIFIC' ? selected : audience === 'EMPLOYEES_ONLY'
+    ? activeEmployees.map(user => user.id)
+    : audience === 'MANAGEMENT_ONLY'
+      ? activeUsers.filter(user => user.role !== 'EMPLOYEE').map(user => user.id)
+      : activeUsers.map(user => user.id);
+  const recipientOptions = activeUsers.map(user => ({ value: user.id, label: ar ? user.arabicName : user.englishName }));
 
-  function save(publish: boolean) {
+  async function save(publish: boolean) {
     if (!title.trim() || !body.trim()) { setError('content'); return; }
     if (publish && !recipients.length) { setError('recipients'); return; }
     const targets = recipients.map(userId => {
@@ -46,11 +51,15 @@ export const CircularEditor: React.FC = () => {
       issuerNameAr: currentUser.arabicName,
       issuerNameEn: currentUser.englishName,
       issuedAt: '2026-10-31 09:15 AM',
-      targetAudience: audience === 'SPECIFIC' ? 'EMPLOYEES_ONLY' : audience,
+      targetAudience: audience,
       isDraft: !publish,
       recipients: targets,
+      parentId: immutable ? base?.id : base?.parentId,
+      emailDelivery: email,
+      smsDelivery: sms,
     };
-    saveCircular(circular, publish);
+    const result = await saveCircular(circular, publish);
+    if (!result.ok) return;
     setConfirm(false);
     navigate('/app/circulars');
   }
@@ -64,6 +73,7 @@ export const CircularEditor: React.FC = () => {
     </Card>
     <Card title={tx('الجمهور','Audience')}>
       <select className="w-full rounded-input border border-brand-border p-3" value={audience} onChange={event=>setAudience(event.target.value as typeof audience)}><option value="EVERYONE">{tx('الجميع','Everyone')}</option><option value="EMPLOYEES_ONLY">{tx('الموظفون فقط','Employees only')}</option><option value="SPECIFIC">{tx('أشخاص محددون','Specific people')}</option></select>
+      {audience==='MANAGEMENT_ONLY'&&<p className="mt-3 text-sm">{tx('سيصل التعميم إلى الإدارة في دائرتك.','The circular will go to management in your department.')}</p>}
       {audience==='SPECIFIC'&&<div className="mt-3"><MultiSelect label={tx('المستلمون','Recipients')} options={recipientOptions} value={selected} onChange={setSelected}/></div>}
       <p className="mt-3">{tx('معاينة المستلمين','Recipient preview')}: {recipients.length} · {recipients.map(userId=>{const user=users.find(candidate=>candidate.id===userId);return ar?user?.arabicName:user?.englishName}).filter(Boolean).join('، ')}</p>
     </Card>

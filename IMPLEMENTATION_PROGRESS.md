@@ -92,3 +92,5 @@ pm run build pass; /auth/login responds HTTP 200.
 
 
 - Assignment workflow follow-up (2026-11-08): Connected employee progress, Google Drive delivery links/notes, and department management approval or return with a required reason to owner-scoped database updates. Stored submissions, assignment events, audit entries, and internal notifications in Neon. Backend TypeScript build and frontend TypeScript check pass; browser/database workflow verification remains pending. The next persistence area is projects.
+
+- Circular persistence follow-up (2026-11-09): Added authenticated Neon-backed circular listing, draft create/update, publish, department-scoped audience expansion, recipient records, internal notifications, and audit events. Employees can persist their own reading acknowledgment; authorized managers can record reminder attempts per recipient. Circular tracking now reads persistent acknowledgment/reminder counts. Email/SMS are still marked as simulated and no messages are sent. Backend build and frontend TypeScript check pass; full browser/database workflow verification remains pending.
