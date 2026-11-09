@@ -230,23 +230,23 @@ export const Topbar: React.FC = () => {
           )}
         </div>
       </div>
-      {welcomeGreetingOpen && <div dir="rtl" className="pointer-events-none fixed inset-x-4 bottom-5 z-[60] flex justify-end sm:inset-x-auto sm:bottom-6 sm:end-6 sm:w-[min(92vw,25rem)]">
-        <section aria-label="رسالة ترحيب" aria-live="polite" role="status" className="welcome-toast pointer-events-auto relative w-full overflow-hidden rounded-3xl border border-brand-border bg-white shadow-dialog">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-brand-magenta via-brand-plum to-brand-magenta" />
-          <div className="flex items-center gap-3 p-4 pt-5 sm:gap-4 sm:p-5 sm:pt-6">
-            <div className="relative h-14 w-14 shrink-0">
-              <div className="absolute inset-0 rounded-2xl bg-brand-magenta/10" />
-              <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border border-brand-plum/15 bg-brand-plum text-xl font-bold text-white shadow-sm">
+      {welcomeGreetingOpen && <div dir="rtl" className="fixed inset-0 z-[60] grid place-items-center p-4 sm:p-6">
+        <div aria-hidden="true" className="welcome-backdrop absolute inset-0 bg-slate-950/40 backdrop-blur-sm" />
+        <section aria-label="رسالة ترحيب" aria-live="polite" role="status" className="welcome-greeting-panel relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-dialog ring-1 ring-black/5">
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-l from-brand-magenta via-brand-plum to-brand-magenta" />
+          <div aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-48 w-48 rounded-full bg-brand-magenta/5 blur-2xl" />
+          <button type="button" onClick={dismissWelcomeGreeting} className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-brand-lightGray/70 text-brand-charcoal transition hover:bg-brand-lightGray focus:outline-none focus:ring-2 focus:ring-brand-plum" aria-label="إغلاق رسالة الترحيب"><X className="h-4 w-4" /></button>
+          <div className="relative flex flex-col items-center px-6 pb-7 pt-9 text-center sm:px-9 sm:pb-9 sm:pt-11">
+            <div className="relative mb-5 h-[5.25rem] w-[5.25rem]">
+              <div className="absolute -inset-2 rounded-[1.8rem] bg-brand-magenta/10 blur-sm" />
+              <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[1.5rem] border border-brand-plum/15 bg-brand-plum text-3xl font-bold text-white shadow-card">
                 {currentUser.avatar ? <img src={currentUser.avatar} alt="" className="h-full w-full object-cover" /> : currentUser.arabicName.charAt(0)}
               </div>
-              <span className="absolute -bottom-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-brand-magenta text-white shadow-sm"><Sparkles className="h-3 w-3" /></span>
+              <span className="absolute -bottom-2 -left-2 flex h-8 w-8 items-center justify-center rounded-full border-[3px] border-white bg-brand-magenta text-white shadow-sm"><Sparkles className="h-3.5 w-3.5" /></span>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold text-brand-plum">مرحباً بك في نظام إدارة أعمال دائرة الإعلام</p>
-              <h2 className="mt-1 truncate text-base font-bold text-brand-darkText">أهلاً وسهلاً، {currentUser.arabicName}</h2>
-              <p className="mt-1 truncate text-xs text-brand-charcoal">{currentUser.jobTitleAr} · نتمنى لك يوماً موفقاً.</p>
-            </div>
-            <button type="button" onClick={dismissWelcomeGreeting} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-brand-charcoal transition hover:bg-brand-lightGray focus:outline-none focus:ring-2 focus:ring-brand-plum" aria-label="إغلاق رسالة الترحيب"><X className="h-4 w-4" /></button>
+            <p className="text-xs font-semibold text-brand-plum">مرحباً بك في نظام إدارة أعمال دائرة الإعلام</p>
+            <h2 className="mt-2 text-xl font-bold text-brand-darkText sm:text-2xl">أهلاً وسهلاً، {currentUser.arabicName}</h2>
+            <p className="mt-2 max-w-sm text-sm text-brand-charcoal">{currentUser.jobTitleAr} · نتمنى لك يوماً موفقاً.</p>
           </div>
           <div className="h-1 w-full bg-brand-plum/10"><div className="welcome-progress h-full bg-brand-magenta" /></div>
         </section>
