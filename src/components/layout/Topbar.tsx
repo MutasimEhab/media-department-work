@@ -230,7 +230,7 @@ export const Topbar: React.FC = () => {
           )}
         </div>
       </div>
-      {welcomeGreetingOpen && <div dir="rtl" className="pointer-events-none fixed inset-x-4 top-20 z-[60] flex justify-end sm:inset-x-auto sm:end-5 sm:w-[min(92vw,25rem)]">
+      {welcomeGreetingOpen && <div dir="rtl" className="pointer-events-none fixed inset-x-4 bottom-5 z-[60] flex justify-end sm:inset-x-auto sm:bottom-6 sm:end-6 sm:w-[min(92vw,25rem)]">
         <section aria-label="رسالة ترحيب" aria-live="polite" role="status" className="welcome-toast pointer-events-auto relative w-full overflow-hidden rounded-3xl border border-brand-border bg-white shadow-dialog">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-brand-magenta via-brand-plum to-brand-magenta" />
           <div className="flex items-center gap-3 p-4 pt-5 sm:gap-4 sm:p-5 sm:pt-6">
