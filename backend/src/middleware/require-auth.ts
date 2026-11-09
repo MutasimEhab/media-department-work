@@ -14,7 +14,7 @@ export async function requireAuth(request: AuthenticatedRequest, response: Respo
       return;
     }
     request.authUser = user;
-    request.permissions = await getEffectivePermissions(user.id, user.roleCode);
+    request.permissions = await getEffectivePermissions(user.id, user.accountTypeCode);
     next();
   } catch {
     response.status(503).json({ code: 'AUTH_UNAVAILABLE', message: 'تعذر التحقق من الجلسة حالياً.' });

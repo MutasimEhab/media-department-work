@@ -28,14 +28,17 @@ router.use(requireAuth);
 
 router.get('/', async (_request, response) => {
   try {
-    const result = await db.query<{ role_code: typeof roles[number]; permission_code: typeof featurePermissions[number] }>(
+    const result = await db.query<{ role_code: string; permission_code: typeof featurePermissions[number] }>(
       `SELECT role_code, permission_code FROM role_permissions
         WHERE permission_code = ANY($1::text[]) ORDER BY role_code, permission_code`,
       [featurePermissions],
     );
-    const permissions: Record<string, string[]> = Object.fromEntries(
-      roles.map(role => [roleToFrontend[role], result.rows.filter(row => row.role_code === role).map(row => row.permission_code)]),
-    );
+    const permissions: Record<string, string[]> = result.rows.reduce<Record<string, string[]>>((grouped, row) => {
+        const key = roleToFrontend[row.role_code as typeof roles[number]] || row.role_code;
+        (grouped[key] ||= []).push(row.permission_code);
+        return grouped;
+      }, {});
+    for (const role of roles) permissions[roleToFrontend[role]] ||= [];
     response.json({ rolePermissions: permissions });
   } catch {
     response.status(503).json({ message: 'تعذر تحميل مصفوفة الصلاحيات.' });
@@ -50,7 +53,11 @@ router.put('/:roleCode', async (request: AuthenticatedRequest, response) => {
   const roleCode = request.params.roleCode;
   const requestedRole = Array.isArray(roleCode) ? roleCode[0] : roleCode;
   const role = frontendToRole[requestedRole || ''] || requestedRole;
-  if (!role || !roles.includes(role as typeof roles[number]) || role === 'system_admin') {
+  const found = role ? await db.query<{ base_role_code: string; is_system: boolean }>(
+    'SELECT base_role_code, is_system FROM roles WHERE code = $1', [role],
+  ) : { rows: [] };
+  const accountType = found.rows[0];
+  if (!role || !accountType || role === 'system_admin') {
     response.status(400).json({ message: 'الدور المحدد غير قابل للتعديل.' });
     return;
   }
@@ -61,7 +68,7 @@ router.put('/:roleCode', async (request: AuthenticatedRequest, response) => {
   }
   const codes = [...new Set(requested as string[])];
   const roleSpecificForbidden = codes.some(code => adminOnlyPermissions.has(code)
-    || (role === 'employee' && employeeRestrictedPermissions.has(code)));
+    || (accountType.base_role_code === 'employee' && employeeRestrictedPermissions.has(code)));
   if (roleSpecificForbidden) {
     response.status(400).json({ message: 'إحدى الصلاحيات لا تُمنح لهذا الدور.' });
     return;
@@ -82,7 +89,7 @@ router.put('/:roleCode', async (request: AuthenticatedRequest, response) => {
       [request.authUser!.id, JSON.stringify({ roleCode: role, permissionCodes: codes })],
     );
     await client.query('COMMIT');
-    response.json({ role: roleToFrontend[role as typeof roles[number]], permissionCodes: codes });
+    response.json({ role: roleToFrontend[role as typeof roles[number]] || role, permissionCodes: codes });
   } catch {
     await client.query('ROLLBACK');
     response.status(503).json({ message: 'تعذر حفظ مصفوفة الصلاحيات.' });

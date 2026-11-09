@@ -32,10 +32,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
   EMPLOYEE: ['view_employee_dashboard','create_work_log','view_own_work_logs','manage_own_work_logs','view_assignments','view_projects','view_circulars','view_notifications','view_own_exceptions','view_own_report'],
 };
 
-export type RolePermissionOverrides = Partial<Record<UserRole, AppPermission[]>>;
+export type RolePermissionOverrides = Partial<Record<string, AppPermission[]>>;
 
-export function roleHasPermission(role: UserRole, permission: AppPermission, overrides: RolePermissionOverrides = {}): boolean {
+export function roleHasPermission(role: string, permission: AppPermission, overrides: RolePermissionOverrides = {}): boolean {
   // Preserve an emergency administrator route so system access cannot be locked out.
   if (role === 'ADMIN') return true;
-  return (overrides[role] || DEFAULT_ROLE_PERMISSIONS[role]).includes(permission);
+  const fallbackRole = role as UserRole;
+  const fallback = fallbackRole in DEFAULT_ROLE_PERMISSIONS ? DEFAULT_ROLE_PERMISSIONS[fallbackRole] : [];
+  return (overrides[role] || fallback).includes(permission);
 }

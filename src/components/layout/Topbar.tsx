@@ -59,7 +59,7 @@ export const Topbar: React.FC = () => {
       ...projects.filter(project => (canAccess('manage_projects') || project.ownerId === currentUser.id) && `${project.titleAr} ${project.id}`.toLocaleLowerCase('ar').includes(term)).map(project => ({ label: project.titleAr, detail: `مشروع · ${project.id}`, href: `/app/projects/${project.id}` })),
       ...circulars.filter(item => !item.isDraft && (canAccess('manage_circulars') || item.recipients.some(recipient => recipient.userId === currentUser.id)) && `${item.titleAr} ${item.id}`.toLocaleLowerCase('ar').includes(term)).map(item => ({ label: item.titleAr, detail: `تعميم · ${item.id}`, href: '/app/circulars' })),
       ...workLogs.filter(log => (canAccess('view_department_work_logs') || log.userId === currentUser.id) && `${log.activityAr} ${log.descriptionAr || ''} ${log.id} ${log.date}`.toLocaleLowerCase('ar').includes(term)).map(log => ({ label: log.activityAr, detail: `سجل عمل · ${log.date}`, href: canAccess('view_department_work_logs') ? '/app/management/work-logs' : '/app/work' })),
-      ...(canAccess('manage_users') ? users.filter(user => `${user.arabicName} ${user.username || ''} ${user.email}`.toLocaleLowerCase('ar').includes(term)).map(user => ({ label: user.arabicName, detail: `مستخدم · ${user.username || user.email}`, href: `/app/admin/users/${user.id}` })) : []),
+      ...(canAccess('manage_users') ? users.filter(user => `${user.arabicName} ${user.username || ''} ${user.email || ''}`.toLocaleLowerCase('ar').includes(term)).map(user => ({ label: user.arabicName, detail: `مستخدم · ${user.username || user.email || 'بدون بريد'}`, href: `/app/admin/users/${user.id}` })) : []),
     ].slice(0, 8);
   }, [searchQuery, tasks, projects, circulars, workLogs, users, canAccess, currentUser.id]);
 
@@ -195,7 +195,7 @@ export const Topbar: React.FC = () => {
             <div className="absolute end-0 mt-2 w-56 bg-white rounded-card border border-brand-border shadow-dialog p-2 z-50 animate-in fade-in zoom-in-95 duration-100">
               <div className="px-3 py-2 border-b border-brand-border/60">
                 <p className="text-xs font-bold text-brand-darkText">{language === 'ar' ? currentUser.arabicName : currentUser.englishName}</p>
-                <p className="text-[11px] text-brand-charcoal/70 truncate">{currentUser.email}</p>
+                <p className="text-[11px] text-brand-charcoal/70 truncate">{currentUser.email || 'البريد غير مسجل'}</p>
                 <span className="inline-block mt-1 text-[10px] bg-brand-plum/10 text-brand-plum font-semibold px-2 py-0.5 rounded">
                   {t.roles[currentUser.role]}
                 </span>

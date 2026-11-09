@@ -25,6 +25,8 @@ interface UserRow {
   department_id: string | null;
   department_name_ar: string | null;
   role_code: RoleCode;
+  account_type_code: string;
+  account_type_name_ar: string;
 }
 
 const roleNames: Record<RoleCode, 'ADMIN' | 'MANAGER' | 'DEPUTY' | 'EMPLOYEE'> = {
@@ -76,9 +78,11 @@ async function findUser(identifier: string): Promise<UserRow | undefined> {
   const result = await db.query<UserRow>(
     `SELECT u.id, u.username, u.email, u.password_hash, u.full_name_ar,
             u.job_title_ar, u.mobile, u.employee_number, u.avatar_data, u.is_active, u.department_id,
-            d.name_ar AS department_name_ar, u.role_code
+            d.name_ar AS department_name_ar, u.role_code, u.account_type_code,
+            account_type.name_ar AS account_type_name_ar
        FROM users u
        LEFT JOIN departments d ON d.id = u.department_id
+       LEFT JOIN roles account_type ON account_type.code = u.account_type_code
       WHERE lower(u.username) = $1 OR lower(u.email) = $1
       LIMIT 1`,
     [identifier],
@@ -117,6 +121,8 @@ function publicUser(user: UserRow) {
     username: user.username,
     arabicName: user.full_name_ar,
     role: roleNames[user.role_code],
+    accountTypeCode: user.account_type_code,
+    accountTypeNameAr: user.account_type_name_ar,
     jobTitleAr: user.job_title_ar,
     email: user.email,
     mobile: user.mobile ?? undefined,
@@ -131,6 +137,7 @@ function publicUser(user: UserRow) {
 export interface AuthenticatedUser {
   id: string;
   roleCode: RoleCode;
+  accountTypeCode: string;
   departmentId: string | null;
   username: string;
   email: string;
@@ -151,7 +158,7 @@ export async function authenticateRequest(request: Request): Promise<Authenticat
         AND s.expires_at > now()
         AND s.last_seen_at > now() - ($2::text || ' minutes')::interval
         AND u.is_active = true
-      RETURNING u.id, u.role_code AS "roleCode", u.department_id AS "departmentId",
+      RETURNING u.id, u.role_code AS "roleCode", u.account_type_code AS "accountTypeCode", u.department_id AS "departmentId",
                 u.username, u.email, u.full_name_ar AS "fullNameAr", s.id AS session_id`,
     [tokenHash, IDLE_TIMEOUT_MINUTES],
   );
@@ -159,6 +166,7 @@ export async function authenticateRequest(request: Request): Promise<Authenticat
   return row ? {
     id: row.id,
     roleCode: row.roleCode,
+    accountTypeCode: row.accountTypeCode,
     departmentId: row.departmentId,
     username: row.username,
     email: row.email,
@@ -166,7 +174,7 @@ export async function authenticateRequest(request: Request): Promise<Authenticat
   } : null;
 }
 
-export async function getEffectivePermissions(userId: string, roleCode: RoleCode): Promise<string[]> {
+export async function getEffectivePermissions(userId: string, accountTypeCode: string): Promise<string[]> {
   const result = await db.query<{ code: string }>(
     `SELECT p.code
        FROM permissions p
@@ -176,7 +184,7 @@ export async function getEffectivePermissions(userId: string, roleCode: RoleCode
          ON upo.permission_code = p.code AND upo.user_id = $1
       WHERE COALESCE(upo.is_granted, rp.permission_code IS NOT NULL) = true
       ORDER BY p.code`,
-    [userId, roleCode],
+    [userId, accountTypeCode],
   );
   return result.rows.map((row) => row.code);
 }
@@ -235,7 +243,7 @@ router.post('/login', async (request, response) => {
   );
   await db.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
   setSessionCookie(response, token);
-  const permissions = await getEffectivePermissions(user.id, user.role_code);
+  const permissions = await getEffectivePermissions(user.id, user.account_type_code);
   response.json({ user: publicUser(user), permissions });
 });
 
@@ -252,7 +260,7 @@ router.get('/me', async (request, response) => {
     response.status(401).json({ code: 'UNAUTHENTICATED', message: 'يرجى تسجيل الدخول للمتابعة.' });
     return;
   }
-  response.json({ user: publicUser(dbUser), permissions: await getEffectivePermissions(user.id, user.roleCode) });
+  response.json({ user: publicUser(dbUser), permissions: await getEffectivePermissions(user.id, user.accountTypeCode) });
 });
 
 router.post('/logout', async (request, response) => {

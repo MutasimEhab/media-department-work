@@ -13,6 +13,7 @@ import circularsRouter from './routes/circulars.js';
 import notificationsRouter from './routes/notifications.js';
 import systemSettingsRouter from './routes/system-settings.js';
 import rolePermissionsRouter from './routes/role-permissions.js';
+import accountTypesRouter from './routes/account-types.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -33,6 +34,7 @@ app.use('/api/circulars', circularsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/system-settings', systemSettingsRouter);
 app.use('/api/role-permissions', rolePermissionsRouter);
+app.use('/api/account-types', accountTypesRouter);
 
 app.get('/api/health', async (_request, response) => {
   try {

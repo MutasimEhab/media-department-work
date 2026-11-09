@@ -29,6 +29,8 @@ function publicUser(row: Record<string, unknown>) {
     username: row.username,
     arabicName: row.full_name_ar,
     role: codeToRole[String(row.role_code)] ?? 'EMPLOYEE',
+    accountTypeCode: String(row.account_type_code ?? row.role_code),
+    accountTypeNameAr: String(row.account_type_name_ar ?? row.role_name_ar ?? ''),
     jobTitleAr: row.job_title_ar,
     employeeNumber: row.employee_number ?? undefined,
     avatar: row.avatar_data ?? undefined,
@@ -52,17 +54,19 @@ function routeUserId(request: AuthenticatedRequest): string {
 }
 
 async function findManageableTarget(request: AuthenticatedRequest, userId: string) {
-  const result = await db.query<{ id: string; role_code: string; department_id: string | null }>(
-    'SELECT id, role_code, department_id FROM users WHERE id = $1',
+  const result = await db.query<{ id: string; role_code: string; account_type_code: string; department_id: string | null }>(
+    'SELECT id, role_code, account_type_code, department_id FROM users WHERE id = $1',
     [userId],
   );
   const target = result.rows[0];
   if (!target) return { target: null, allowed: false };
   const actor = request.authUser!;
+  const targetIsDepartmentEmployee = target.role_code === 'employee';
+  const managerCanManageDeputy = actor.roleCode === 'department_manager' && target.role_code === 'deputy_manager';
   const allowed = actor.roleCode === 'system_admin'
     || (['department_manager', 'deputy_manager'].includes(actor.roleCode)
       && Boolean(request.permissions?.includes('manage_users'))
-      && target.role_code === 'employee'
+      && (targetIsDepartmentEmployee || managerCanManageDeputy)
       && target.department_id === actor.departmentId);
   return { target, allowed };
 }
@@ -74,6 +78,130 @@ router.get('/departments', async (_request, response) => {
     'SELECT id, name_ar FROM departments ORDER BY name_ar',
   );
   response.json({ departments: result.rows.map((row) => ({ id: row.id, nameAr: row.name_ar })) });
+});
+
+router.get('/account-types', async (request: AuthenticatedRequest, response) => {
+  if (!canManageUsers(request)) {
+    response.status(403).json({ message: 'لا تملك صلاحية عرض أنواع الحسابات.' });
+    return;
+  }
+  const result = await db.query<{ code: string; name_ar: string; base_role_code: string; is_system: boolean }>(
+    `SELECT code, name_ar, base_role_code, is_system FROM roles
+      WHERE base_role_code <> 'system_admin' ORDER BY is_system DESC, name_ar`,
+  );
+  response.json({ accountTypes: result.rows.map((row) => ({
+    code: row.code, nameAr: row.name_ar, baseRoleCode: row.base_role_code, isSystem: row.is_system,
+  })) });
+});
+
+router.get('/report-employees', async (request: AuthenticatedRequest, response) => {
+  if (!request.permissions?.includes('view_department_reports') && request.authUser?.roleCode !== 'system_admin') {
+    response.status(403).json({ message: 'لا تملك صلاحية عرض أسماء الموظفين في التقارير.' });
+    return;
+  }
+  const actor = request.authUser!;
+  const result = await db.query<{ id: string; full_name_ar: string }>(
+    `SELECT id, full_name_ar FROM users
+      WHERE role_code = 'employee' AND is_active = true
+        AND ($1::text = 'system_admin' OR department_id = $2)
+      ORDER BY full_name_ar`,
+    [actor.roleCode, actor.departmentId],
+  );
+  response.json({ employees: result.rows.map((row) => ({ id: row.id, arabicName: row.full_name_ar })) });
+});
+
+router.get('/job-titles', async (request: AuthenticatedRequest, response) => {
+  const actor = request.authUser!;
+  const result = await db.query<{ id: string; name_ar: string; department_id: string | null }>(
+    `SELECT id, name_ar, department_id FROM job_titles
+      WHERE department_id IS NULL OR department_id = $1
+      ORDER BY name_ar`,
+    [actor.departmentId],
+  );
+  response.json({ jobTitles: result.rows.map((row) => ({ id: row.id, nameAr: row.name_ar, departmentId: row.department_id ?? undefined })) });
+});
+
+router.post('/job-titles', async (request: AuthenticatedRequest, response) => {
+  const actor = request.authUser!;
+  const nameAr = typeof request.body?.nameAr === 'string' ? request.body.nameAr.trim() : '';
+  if (!nameAr || nameAr.length > 120) {
+    response.status(400).json({ message: 'اكتب مسمى وظيفياً من 1 إلى 120 حرفاً.' });
+    return;
+  }
+  if (actor.roleCode !== 'system_admin' && (!request.permissions?.includes('manage_users') || !actor.departmentId)) {
+    response.status(403).json({ message: 'لا تملك صلاحية إدارة المسميات الوظيفية.' });
+    return;
+  }
+  const departmentId = actor.roleCode === 'system_admin' ? null : actor.departmentId;
+  try {
+    const result = await db.query<{ id: string; name_ar: string; department_id: string | null }>(
+      `INSERT INTO job_titles (name_ar, department_id, created_by) VALUES ($1, $2, $3)
+       RETURNING id, name_ar, department_id`,
+      [nameAr, departmentId, actor.id],
+    );
+    const createdTitle = result.rows[0]!;
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, 'job_title.create', 'job_titles', $2, $3::jsonb)`,
+      [actor.id, createdTitle.id, JSON.stringify({ nameAr })],
+    );
+    response.status(201).json({ jobTitle: { id: createdTitle.id, nameAr: createdTitle.name_ar, departmentId: createdTitle.department_id ?? undefined } });
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+      response.status(409).json({ message: 'هذا المسمى الوظيفي موجود مسبقاً.' });
+      return;
+    }
+    response.status(503).json({ message: 'تعذر إضافة المسمى الوظيفي.' });
+  }
+});
+
+router.patch('/job-titles/:titleId', async (request: AuthenticatedRequest, response) => {
+  const actor = request.authUser!;
+  const nameAr = typeof request.body?.nameAr === 'string' ? request.body.nameAr.trim() : '';
+  if (!nameAr || nameAr.length > 120) {
+    response.status(400).json({ message: 'اكتب مسمى وظيفياً من 1 إلى 120 حرفاً.' });
+    return;
+  }
+  if (actor.roleCode !== 'system_admin' && (!request.permissions?.includes('manage_users') || !actor.departmentId)) {
+    response.status(403).json({ message: 'لا تملك صلاحية تعديل المسميات الوظيفية.' });
+    return;
+  }
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const found = await client.query<{ id: string; name_ar: string; department_id: string | null }>(
+      `SELECT id, name_ar, department_id FROM job_titles WHERE id = $1 FOR UPDATE`,
+      [request.params.titleId],
+    );
+    const current = found.rows[0];
+    if (!current || (actor.roleCode !== 'system_admin' && current.department_id !== actor.departmentId)) {
+      await client.query('ROLLBACK');
+      response.status(404).json({ message: 'المسمى الوظيفي غير موجود في دائرتك.' });
+      return;
+    }
+    await client.query('UPDATE job_titles SET name_ar = $2 WHERE id = $1', [current.id, nameAr]);
+    await client.query(
+      `UPDATE users SET job_title_ar = $2, updated_at = now()
+        WHERE job_title_ar = $1 AND ($3::uuid IS NULL OR department_id = $3)`,
+      [current.name_ar, nameAr, current.department_id],
+    );
+    await client.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, 'job_title.rename', 'job_titles', $2, $3::jsonb)`,
+      [actor.id, current.id, JSON.stringify({ from: current.name_ar, to: nameAr })],
+    );
+    await client.query('COMMIT');
+    response.json({ jobTitle: { id: current.id, nameAr, departmentId: current.department_id ?? undefined } });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+      response.status(409).json({ message: 'يوجد مسمى مطابق بالفعل في هذه القائمة.' });
+      return;
+    }
+    response.status(503).json({ message: 'تعذر تعديل المسمى الوظيفي.' });
+  } finally {
+    client.release();
+  }
 });
 
 router.patch('/me/profile', async (request: AuthenticatedRequest, response) => {
@@ -234,8 +362,8 @@ router.patch('/:userId/profile', async (request: AuthenticatedRequest, response)
   }
   const jobTitleAr = typeof request.body?.jobTitleAr === 'string' ? request.body.jobTitleAr.trim() : '';
   const employeeNumber = typeof request.body?.employeeNumber === 'string' ? request.body.employeeNumber.trim() : '';
-  if (!jobTitleAr || !employeeNumber || employeeNumber.length > 40) {
-    response.status(400).json({ message: 'المسمى الوظيفي والرقم الوظيفي مطلوبان، والرقم حتى 40 خانة.' });
+  if (!jobTitleAr || jobTitleAr.length > 120 || employeeNumber.length > 40) {
+    response.status(400).json({ message: 'المسمى الوظيفي مطلوب، والرقم الوظيفي اختياري وحتى 40 خانة.' });
     return;
   }
   try {
@@ -244,7 +372,7 @@ router.patch('/:userId/profile', async (request: AuthenticatedRequest, response)
         WHERE id = $1
         RETURNING id, username, email, full_name_ar, job_title_ar, employee_number, mobile,
                   role_code, is_active, department_id, last_login_at`,
-      [target.id, jobTitleAr, employeeNumber],
+      [target.id, jobTitleAr, employeeNumber || null],
     );
     await db.query(
       `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
@@ -279,7 +407,7 @@ router.get('/:userId/permissions', async (request: AuthenticatedRequest, respons
        LEFT JOIN role_permissions rp ON rp.permission_code = p.code AND rp.role_code = $1
        LEFT JOIN user_permission_overrides upo ON upo.permission_code = p.code AND upo.user_id = $2
       WHERE p.code = ANY($3::text[]) ORDER BY p.name_ar`,
-    [target.role_code, target.id, appPermissionCodes],
+    [target.account_type_code, target.id, appPermissionCodes],
   );
   const restricted = request.authUser!.roleCode !== 'system_admin';
   const permissions = result.rows.filter((permission) => !restricted
@@ -344,10 +472,12 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
   const { roleCode, departmentId } = request.authUser!;
   const result = await db.query(
     `SELECT u.id, u.username, u.email, u.full_name_ar, u.job_title_ar, u.employee_number, u.mobile,
-            u.role_code, u.is_active, u.department_id, u.last_login_at,
+            u.role_code, u.account_type_code, at.name_ar AS account_type_name_ar,
+            u.is_active, u.department_id, u.last_login_at,
             d.name_ar AS department_name_ar
        FROM users u
        LEFT JOIN departments d ON d.id = u.department_id
+       LEFT JOIN roles at ON at.code = u.account_type_code
       WHERE ($1::text = 'system_admin' OR u.department_id = $2)
       ORDER BY u.full_name_ar, u.created_at`,
     [roleCode, departmentId],
@@ -362,21 +492,34 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
   }
 
   const body = request.body ?? {};
-  const role = String(body.role ?? '');
-  const targetRole = roleToCode[role as keyof typeof roleToCode];
+  const accountTypeCode = typeof body.accountTypeCode === 'string' ? body.accountTypeCode : '';
+  const requestedRole = typeof body.role === 'string' ? roleToCode[body.role as keyof typeof roleToCode] : undefined;
   const fullNameAr = typeof body.arabicName === 'string' ? body.arabicName.trim() : '';
   const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
-  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const emailValue = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const email = emailValue || null;
   const jobTitleAr = typeof body.jobTitleAr === 'string' ? body.jobTitleAr.trim() : '';
   const employeeNumber = typeof body.employeeNumber === 'string' ? body.employeeNumber.trim() : '';
   const mobile = typeof body.mobile === 'string' ? body.mobile.trim() : null;
   const password = typeof body.password === 'string' ? body.password : '';
 
-  if (!fullNameAr || !username || !jobTitleAr || !employeeNumber || employeeNumber.length > 40 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    response.status(400).json({ message: 'أدخل الاسم العربي واسم المستخدم والبريد والمسمى والرقم الوظيفي بشكل صحيح.' });
+  if (!fullNameAr || !username || !jobTitleAr || jobTitleAr.length > 120 || employeeNumber.length > 40
+    || (email !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    response.status(400).json({ message: 'أدخل الاسم العربي واسم المستخدم والمسمى، وتحقق من البريد أو الرقم إن أُدخلا.' });
     return;
   }
-  if (!targetRole || targetRole === 'system_admin') {
+  const typeResult = accountTypeCode
+    ? await db.query<{ code: string; name_ar: string; base_role_code: string }>(
+      `SELECT code, name_ar, base_role_code FROM roles WHERE code = $1 AND base_role_code <> 'system_admin'`, [accountTypeCode],
+    )
+    : requestedRole
+      ? await db.query<{ code: string; name_ar: string; base_role_code: string }>(
+        `SELECT code, name_ar, base_role_code FROM roles WHERE code = $1`, [requestedRole],
+      )
+      : { rows: [] };
+  const accountType = typeResult.rows[0];
+  const targetRole = accountType?.base_role_code;
+  if (!accountType || !targetRole || targetRole === 'system_admin') {
     response.status(400).json({ message: 'نوع الحساب المحدد غير مسموح.' });
     return;
   }
@@ -405,15 +548,15 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
   try {
     const passwordHash = await bcrypt.hash(password, 12);
     const created = await db.query(
-      `INSERT INTO users (department_id, role_code, username, email, password_hash,
+      `INSERT INTO users (department_id, role_code, account_type_code, username, email, password_hash,
                           full_name_ar, job_title_ar, employee_number, mobile, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id, username, email, full_name_ar, job_title_ar, mobile,
-                 employee_number, role_code, is_active, department_id, last_login_at`,
-      [departmentId, targetRole, username, email, passwordHash, fullNameAr, jobTitleAr, employeeNumber, mobile || null, actor.id],
+                 employee_number, role_code, account_type_code, is_active, department_id, last_login_at`,
+      [departmentId, targetRole, accountType.code, username, email, passwordHash, fullNameAr, jobTitleAr, employeeNumber || null, mobile || null, actor.id],
     );
     const department = await db.query<{ name_ar: string }>('SELECT name_ar FROM departments WHERE id = $1', [departmentId]);
-    response.status(201).json({ user: publicUser({ ...created.rows[0], department_name_ar: department.rows[0]?.name_ar ?? '' }) });
+    response.status(201).json({ user: publicUser({ ...created.rows[0], account_type_name_ar: accountType.name_ar, department_name_ar: department.rows[0]?.name_ar ?? '' }) });
   } catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
       response.status(409).json({ message: 'اسم المستخدم أو البريد أو الرقم الوظيفي مستخدم مسبقاً.' });

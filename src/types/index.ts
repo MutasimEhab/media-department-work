@@ -5,11 +5,13 @@ export interface User {
   arabicName: string;
   englishName: string;
   role: UserRole;
+  accountTypeCode?: string;
+  accountTypeNameAr?: string;
   jobTitleAr: string;
   jobTitleEn: string;
   username?: string;
   employeeNumber?: string;
-  email: string;
+  email?: string;
   avatar?: string;
   isActive: boolean;
   departmentAr: string;

@@ -58,7 +58,7 @@ interface AppContextType {
   addUser: (user: User) => boolean;
   canAccess: (permission: AppPermission) => boolean;
   rolePermissions: RolePermissionOverrides;
-  updateRolePermission: (role: UserRole, permission: AppPermission, enabled: boolean) => Promise<boolean>;
+  updateRolePermission: (role: string, permission: AppPermission, enabled: boolean) => Promise<boolean>;
   exceptions: WorkDateException[];
   addException: (exception: WorkDateException) => void;
   revokeException: (id: string) => void;
@@ -72,10 +72,12 @@ interface BackendUser {
   username: string;
   arabicName: string;
   role: UserRole;
+  accountTypeCode?: string;
+  accountTypeNameAr?: string;
   jobTitleAr: string;
   employeeNumber?: string;
   avatar?: string;
-  email: string;
+  email?: string;
   mobile?: string;
   isActive: boolean;
   departmentId?: string;
@@ -89,6 +91,8 @@ function mapBackendUser(user: BackendUser): User {
     arabicName: user.arabicName,
     englishName: user.arabicName,
     role: user.role,
+    accountTypeCode: user.accountTypeCode,
+    accountTypeNameAr: user.accountTypeNameAr,
     jobTitleAr: user.jobTitleAr,
     employeeNumber: user.employeeNumber,
     avatar: user.avatar,
@@ -325,7 +329,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         timestamp, isRead: false, actionUrl: '/app/work/new',
       }));
       const missingNames = missing.map(user => user.arabicName).join('، ');
-      const authorizedRecipients = users.filter(user => user.isActive && roleHasPermission(user.role, 'receive_missing_work_alerts', rolePermissions));
+      const authorizedRecipients = users.filter(user => user.isActive && roleHasPermission(user.accountTypeCode || user.role, 'receive_missing_work_alerts', rolePermissions));
       for (const recipient of authorizedRecipients) newNotifications.push({
         id: `NTF-MISSING-SUMMARY-${today}-${recipient.id}`, userId: recipient.id, type: 'WORK_LOG_MISSING',
         titleAr: 'متابعة سجلات العمل غير المسجلة', titleEn: 'Missing daily work logs follow-up',
@@ -664,11 +668,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if(currentUser.id===user.id)signIn(user);
     return true;
   };
-  const addUser = (user:User) => { if(users.some(u=>u.email.toLowerCase()===user.email.toLowerCase()||Boolean(user.username&&u.username?.toLowerCase()===user.username.toLowerCase())))return false;setUsers(prev=>[...prev,user]);return true; };
-  const canAccess = (permission: AppPermission) => roleHasPermission(currentUser.role, permission, rolePermissions);
-  const updateRolePermission = async (role: UserRole, permission: AppPermission, enabled: boolean) => {
-    if (currentUser.role !== 'ADMIN' || role === 'ADMIN') return false;
-    const current = rolePermissions[role] || [...DEFAULT_ROLE_PERMISSIONS[role]];
+  const addUser = (user:User) => { if(users.some(u=>(Boolean(u.email)&&Boolean(user.email)&&u.email?.toLowerCase()===user.email?.toLowerCase())||Boolean(user.username&&u.username?.toLowerCase()===user.username.toLowerCase())))return false;setUsers(prev=>[...prev,user]);return true; };
+  const canAccess = (permission: AppPermission) => currentUser.role === 'ADMIN' || roleHasPermission(currentUser.accountTypeCode || currentUser.role, permission, rolePermissions);
+  const updateRolePermission = async (role: string, permission: AppPermission, enabled: boolean) => {
+    if (currentUser.role !== 'ADMIN' || role === 'ADMIN' || role === 'system_admin') return false;
+    const current = rolePermissions[role] || [...(DEFAULT_ROLE_PERMISSIONS[role as UserRole] || [])];
     const nextPermissions = enabled
       ? [...new Set([...current, permission])]
       : current.filter(item => item !== permission);

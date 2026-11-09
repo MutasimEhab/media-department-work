@@ -73,7 +73,7 @@ export const Profile: React.FC = () => {
       <label className="text-sm">المسمى الوظيفي<input className="mt-1 block w-full rounded-input border border-brand-border bg-brand-lightGray/40 p-3" readOnly value={currentUser.jobTitleAr}/></label>
       <label className="text-sm">الرقم الوظيفي<input className="mt-1 block w-full rounded-input border border-brand-border bg-brand-lightGray/40 p-3" readOnly dir="ltr" value={currentUser.employeeNumber||'—'}/></label>
       <label className="text-sm">اسم المستخدم<input className="mt-1 block w-full rounded-input border border-brand-border bg-brand-lightGray/40 p-3" dir="ltr" readOnly value={currentUser.username||'—'}/></label>
-      <label className="text-sm">البريد الإلكتروني<input className="mt-1 block w-full rounded-input border border-brand-border bg-brand-lightGray/40 p-3" dir="ltr" readOnly value={currentUser.email}/></label>
+      <label className="text-sm">البريد الإلكتروني<input className="mt-1 block w-full rounded-input border border-brand-border bg-brand-lightGray/40 p-3" dir="ltr" readOnly value={currentUser.email || ''} placeholder="غير مسجل"/></label>
       <label className="text-sm">رقم الاتصال<input className="mt-1 block w-full rounded-input border border-brand-border p-3" dir="ltr" value={mobile} onChange={e=>setMobile(e.target.value)}/></label>
       <div className="rounded-lg border border-brand-border bg-brand-lightGray/40 p-3 text-sm"><b>لغة الواجهة</b><p className="mt-1">العربية</p></div>
     </div></Card>
