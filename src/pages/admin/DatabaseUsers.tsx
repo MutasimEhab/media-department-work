@@ -9,6 +9,22 @@ interface PermissionOption { code: string; name_ar: string; enabled: boolean }
 interface AccountTypeOption { code: string; nameAr: string; baseRoleCode: string; isSystem: boolean }
 interface JobTitleOption { id: string; nameAr: string; departmentId?: string }
 
+async function readApiPayload(response: Response, fallbackMessage: string) {
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = await response.json() as Record<string, unknown>;
+  } catch {
+    // Some server/proxy failures return HTML or an empty body instead of JSON.
+  }
+  if (!response.ok) {
+    const message = typeof payload.message === 'string' ? payload.message
+      : typeof payload.error === 'string' ? payload.error
+        : `${fallbackMessage} (HTTP ${response.status})`;
+    throw new Error(message);
+  }
+  return payload;
+}
+
 const roleLabels: Record<UserRole, string> = {
   ADMIN: 'مدير النظام', MANAGER: 'مدير الدائرة', DEPUTY: 'نائب مدير الدائرة', EMPLOYEE: 'موظف',
 };
@@ -51,14 +67,10 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
         fetch('/api/users/account-types', { credentials: 'include' }),
         fetch('/api/users/job-titles', { credentials: 'include' }),
       ]);
-      const usersPayload = await usersResponse.json();
-      const departmentsPayload = await departmentsResponse.json();
-      const typesPayload = await typesResponse.json();
-      const titlesPayload = await titlesResponse.json();
-      if (!usersResponse.ok) throw new Error(usersPayload.message || 'تعذر تحميل المستخدمين.');
-      if (!departmentsResponse.ok) throw new Error(departmentsPayload.message || 'تعذر تحميل الدوائر.');
-      if (!typesResponse.ok) throw new Error(typesPayload.message || 'تعذر تحميل أنواع الحسابات.');
-      if (!titlesResponse.ok) throw new Error(titlesPayload.message || 'تعذر تحميل المسميات الوظيفية.');
+      const usersPayload = await readApiPayload(usersResponse, 'تعذر تحميل المستخدمين.');
+      const departmentsPayload = await readApiPayload(departmentsResponse, 'تعذر تحميل الدوائر.');
+      const typesPayload = await readApiPayload(typesResponse, 'تعذر تحميل أنواع الحسابات.');
+      const titlesPayload = await readApiPayload(titlesResponse, 'تعذر تحميل المسميات الوظيفية.');
       setUsers(usersPayload.users as User[]);
       setAccountTypes(typesPayload.accountTypes as AccountTypeOption[]);
       setJobTitles(titlesPayload.jobTitles as JobTitleOption[]);

@@ -85,13 +85,18 @@ router.get('/account-types', async (request: AuthenticatedRequest, response) => 
     response.status(403).json({ message: 'لا تملك صلاحية عرض أنواع الحسابات.' });
     return;
   }
-  const result = await db.query<{ code: string; name_ar: string; base_role_code: string; is_system: boolean }>(
-    `SELECT code, name_ar, base_role_code, is_system FROM roles
-      WHERE base_role_code <> 'system_admin' ORDER BY is_system DESC, name_ar`,
-  );
-  response.json({ accountTypes: result.rows.map((row) => ({
-    code: row.code, nameAr: row.name_ar, baseRoleCode: row.base_role_code, isSystem: row.is_system,
-  })) });
+  try {
+    const result = await db.query<{ code: string; name_ar: string; base_role_code: string; is_system: boolean }>(
+      `SELECT code, name_ar, base_role_code, is_system FROM roles
+        WHERE base_role_code <> 'system_admin' ORDER BY is_system DESC, name_ar`,
+    );
+    response.json({ accountTypes: result.rows.map((row) => ({
+      code: row.code, nameAr: row.name_ar, baseRoleCode: row.base_role_code, isSystem: row.is_system,
+    })) });
+  } catch {
+    console.error('Failed to load account types from the database.');
+    response.status(503).json({ message: 'تعذر قراءة أنواع الحسابات من قاعدة البيانات؛ أعد تشغيل الخادم ثم حدّث الصفحة.' });
+  }
 });
 
 router.get('/report-employees', async (request: AuthenticatedRequest, response) => {
