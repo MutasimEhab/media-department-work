@@ -38,6 +38,54 @@ const roleNames: Record<RoleCode, 'ADMIN' | 'MANAGER' | 'DEPUTY' | 'EMPLOYEE'> =
 
 const dummyPasswordHash = bcrypt.hash(randomBytes(32).toString('hex'), BCRYPT_ROUNDS);
 
+router.post('/change-password', async (request, response) => {
+  const sessionUser = await authenticateRequest(request);
+  if (!sessionUser) {
+    response.status(401).json({ message: 'انتهت الجلسة؛ سجّل الدخول مجدداً.' });
+    return;
+  }
+  const currentPassword = typeof request.body?.currentPassword === 'string' ? request.body.currentPassword : '';
+  const newPassword = typeof request.body?.newPassword === 'string' ? request.body.newPassword : '';
+  if (!currentPassword || newPassword.length < 9 || Buffer.byteLength(newPassword, 'utf8') > 72) {
+    response.status(400).json({ message: 'أدخل كلمة المرور الحالية، واجعل الجديدة 9 أحرف أو أرقام على الأقل.' });
+    return;
+  }
+  try {
+    const found = await db.query<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = $1 AND is_active = true', [sessionUser.id]);
+    const account = found.rows[0];
+    if (!account || !(await bcrypt.compare(currentPassword, account.password_hash))) {
+      response.status(400).json({ message: 'كلمة المرور الحالية غير صحيحة.' });
+      return;
+    }
+    if (await bcrypt.compare(newPassword, account.password_hash)) {
+      response.status(400).json({ message: 'اختر كلمة مرور جديدة مختلفة عن الحالية.' });
+      return;
+    }
+    const token = readSessionToken(request);
+    if (!token) {
+      response.status(401).json({ message: 'انتهت الجلسة؛ سجّل الدخول مجدداً.' });
+      return;
+    }
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1', [sessionUser.id, await bcrypt.hash(newPassword, BCRYPT_ROUNDS)]);
+      await client.query('UPDATE login_sessions SET revoked_at = now() WHERE user_id = $1 AND token_hash <> $2 AND revoked_at IS NULL', [sessionUser.id, hashValue(token)]);
+      await client.query(
+        `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+         VALUES ($1, 'user.password.change', 'users', $1, '{}'::jsonb)`, [sessionUser.id],
+      );
+      await client.query('COMMIT');
+      response.json({ message: 'تم تغيير كلمة المرور بنجاح.' });
+    } catch {
+      await client.query('ROLLBACK');
+      response.status(503).json({ message: 'تعذر حفظ كلمة المرور حالياً.' });
+    } finally { client.release(); }
+  } catch {
+    response.status(503).json({ message: 'تعذر التحقق من كلمة المرور حالياً.' });
+  }
+});
+
 function hashValue(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }

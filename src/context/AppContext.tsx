@@ -2,11 +2,6 @@ import React, { createContext, useCallback, useContext, useState, useEffect } fr
 import { User, Task, Project, Circular, WorkLog, NotificationItem, UserRole, WorkDateException } from '../types';
 import {
   MOCK_USERS,
-  MOCK_TASKS,
-  MOCK_PROJECTS,
-  MOCK_CIRCULARS,
-  MOCK_WORK_LOGS,
-  MOCK_NOTIFICATIONS,
   FROZEN_DEMO_DATE,
 } from '../data/mockData';
 import { translations, Language } from '../i18n/translations';
@@ -200,39 +195,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => { cancelled = true; };
   }, [isAuthenticated, currentUser.id]);
 
-  const [users, setUsers] = useState<User[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('official_users') || '[]') as User[];
-      return [...MOCK_USERS.filter(user => !saved.some(entry => entry.id === user.id)), ...saved];
-    } catch { return MOCK_USERS; }
-  });
+  const [users, setUsers] = useState<User[]>([]);
   const [rolePermissions, setRolePermissions] = useState<RolePermissionOverrides>({
     MANAGER: [...DEFAULT_ROLE_PERMISSIONS.MANAGER],
     DEPUTY: [...DEFAULT_ROLE_PERMISSIONS.DEPUTY],
     EMPLOYEE: [...DEFAULT_ROLE_PERMISSIONS.EMPLOYEE],
   });
-  const [exceptions, setExceptions] = useState<WorkDateException[]>(() => { try { return JSON.parse(localStorage.getItem('demo_work_exceptions')||'[]') as WorkDateException[]; } catch { return []; } });
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('demo_task_drafts') || '[]') as Task[];
-      return [...MOCK_TASKS.filter(t => !saved.some(s => s.id === t.id)), ...saved];
-    } catch { return MOCK_TASKS; }
-  });
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
-  const [circulars, setCirculars] = useState<Circular[]>(() => {
-    try { const drafts=JSON.parse(localStorage.getItem('demo_circular_drafts')||'[]') as Circular[];return [...MOCK_CIRCULARS.filter(c=>!drafts.some(d=>d.id===c.id)),...drafts]; } catch { return MOCK_CIRCULARS; }
-  });
-  const [workLogs, setWorkLogs] = useState<WorkLog[]>(MOCK_WORK_LOGS);
-  const [pendingWork, setPendingWork] = useState<WorkLog[]>(() => {
-    try { return JSON.parse(localStorage.getItem('demo_pending_work') || '[]') as WorkLog[]; }
-    catch { return []; }
-  });
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('official_app_notifications') || '[]') as NotificationItem[];
-      return [...MOCK_NOTIFICATIONS.filter(item => !saved.some(entry => entry.id === item.id)), ...saved];
-    } catch { return MOCK_NOTIFICATIONS; }
-  });
+  const [exceptions, setExceptions] = useState<WorkDateException[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [circulars, setCirculars] = useState<Circular[]>([]);
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+  const [pendingWork, setPendingWork] = useState<WorkLog[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -245,10 +220,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
       .then(payload => {
         if (!cancelled && payload?.workLogs) {
-          setWorkLogs(previous => [
-            ...payload.workLogs!,
-            ...previous.filter(log => log.userId !== currentUser.id),
-          ]);
+          setWorkLogs(payload.workLogs!);
         }
       })
       .catch(() => undefined);
@@ -278,10 +250,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (projectResponse.ok && projectPayload.projects) setProjects(projectPayload.projects);
       if (circularResponse.ok && circularPayload.circulars) setCirculars(circularPayload.circulars);
       if (notificationResponse.ok && notificationPayload.notifications) {
-        setNotifications(previous => {
-          const persistedIds = new Set(notificationPayload.notifications!.map(item => item.id));
-          return [...notificationPayload.notifications!, ...previous.filter(item => item.userId !== currentUser.id || !persistedIds.has(item.id))];
-        });
+        setNotifications(notificationPayload.notifications!);
       }
     }).catch(() => undefined);
     return () => { cancelled = true; };
@@ -300,61 +269,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try { localStorage.setItem('official_display_theme', theme); } catch { /* apply for this session */ }
   }, [theme]);
 
-  useEffect(() => {
-    try { localStorage.setItem('official_app_notifications', JSON.stringify(notifications)); } catch { /* current tab retains alerts */ }
-  }, [notifications]);
-
-  useEffect(() => {
-    try { localStorage.setItem('official_users', JSON.stringify(users)); } catch { /* current session retains account updates */ }
-  }, [users]);
-
-  useEffect(() => {
-    try { localStorage.setItem('demo_pending_work', JSON.stringify(pendingWork)); } catch { /* current tab retains the queue */ }
-  }, [pendingWork]);
-
-  useEffect(() => {
-    const checkMissingWork = () => {
-      let config: { timezone?: string; workdays?: string[]; missingWorkAlertsEnabled?: boolean; missingWorkAlertTime?: string } = {};
-      try { config = JSON.parse(localStorage.getItem('official_system_settings') || '{}'); } catch { /* use institutional defaults */ }
-      if (config.missingWorkAlertsEnabled === false) return;
-      const timezone = config.timezone || 'Asia/Gaza';
-      const now = new Date();
-      const dayName = new Intl.DateTimeFormat('ar', { timeZone: timezone, weekday: 'long' }).format(now);
-      const workdays = config.workdays || ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس'];
-      if (!workdays.includes(dayName)) return;
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-      const currentTime = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
-      if (currentTime < (config.missingWorkAlertTime || '15:00')) return;
-      const sentKey = `missing_work_alerts_sent_${today}`;
-      try { if (localStorage.getItem(sentKey)) return; } catch { /* continue with in-memory duplicate check */ }
-      const missing = users.filter(user => user.role === 'EMPLOYEE' && user.isActive && !workLogs.some(log => log.userId === user.id && log.date === today));
-      if (!missing.length) return;
-      const timestamp = new Intl.DateTimeFormat('ar', { timeZone: timezone, dateStyle: 'short', timeStyle: 'short' }).format(now);
-      const newNotifications: NotificationItem[] = missing.map(user => ({
-        id: `NTF-MISSING-${today}-${user.id}`, userId: user.id, type: 'WORK_LOG_MISSING',
-        titleAr: 'تذكير بتسجيل العمل اليومي', titleEn: 'Daily work log reminder',
-        messageAr: `لم يظهر لك سجل عمل لهذا اليوم (${today}). يرجى تسجيل عملك أو التواصل مع مدير الدائرة.`,
-        messageEn: `No work log was found for today (${today}). Please submit your work or contact your manager.`,
-        timestamp, isRead: false, actionUrl: '/app/work/new',
-      }));
-      const missingNames = missing.map(user => user.arabicName).join('، ');
-      const authorizedRecipients = users.filter(user => user.isActive && roleHasPermission(permissionKeyForUser(user), 'receive_missing_work_alerts', rolePermissions));
-      for (const recipient of authorizedRecipients) newNotifications.push({
-        id: `NTF-MISSING-SUMMARY-${today}-${recipient.id}`, userId: recipient.id, type: 'WORK_LOG_MISSING',
-        titleAr: 'متابعة سجلات العمل غير المسجلة', titleEn: 'Missing daily work logs follow-up',
-        messageAr: `لم يظهر سجل عمل يومي لـ ${missing.length} موظفًا حتى موعد الفحص (${config.missingWorkAlertTime || '15:00'}). الأسماء: ${missingNames}.`,
-        messageEn: `${missing.length} employee(s) have no work log by the configured check time.`,
-        timestamp, isRead: false, actionUrl: '/app/management/work-logs',
-      });
-      try { localStorage.setItem(sentKey, 'sent'); } catch { /* in-memory notifications still prevent repeat in this tab */ }
-      setNotifications(previous => [...newNotifications.filter(item => !previous.some(old => old.id === item.id)), ...previous]);
-    };
-    checkMissingWork();
-    const timer = window.setInterval(checkMissingWork, 60_000);
-    return () => window.clearInterval(timer);
-  }, [users, workLogs, rolePermissions]);
 
   const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
+  const clearAccountData = () => {
+    setUsers([]); setTasks([]); setProjects([]); setCirculars([]); setWorkLogs([]);
+    setPendingWork([]); setNotifications([]); setExceptions([]);
+    setRolePermissions({
+      MANAGER: [...DEFAULT_ROLE_PERMISSIONS.MANAGER],
+      DEPUTY: [...DEFAULT_ROLE_PERMISSIONS.DEPUTY],
+      EMPLOYEE: [...DEFAULT_ROLE_PERMISSIONS.EMPLOYEE],
+    });
+  };
   const signIn = (user: User) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
@@ -370,6 +295,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const payload = await response.json() as { code?: string; user?: BackendUser };
       if (!response.ok || !payload.user) return { ok: false, code: payload.code || 'LOGIN_UNAVAILABLE' };
       const user = mapBackendUser(payload.user);
+      clearAccountData();
       setCurrentUser(user);
       setIsAuthenticated(true);
       setWelcomeGreetingOpen(true);
@@ -380,6 +306,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   const signOut = () => {
     void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => undefined);
+    clearAccountData();
     setIsAuthenticated(false);
     setCurrentUser(MOCK_USERS.find(user => user.id === 'U-002') || MOCK_USERS[0]);
   };
@@ -699,13 +626,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
   };
-  const addException = (exception: WorkDateException) => {
-    setExceptions(prev=>{const next=[exception,...prev];try{localStorage.setItem('demo_work_exceptions',JSON.stringify(next));}catch{}return next;});
-    const n:NotificationItem={id:`NTF-EX-${exception.id}`,userId:exception.userId,type:'TASK_ASSIGNED',titleAr:'استثناء تاريخ عمل',titleEn:'Work date exception granted',messageAr:`تم منحك استثناء للتسجيل عن: ${exception.dates.join(', ')}`,messageEn:`You have a work-log exception for: ${exception.dates.join(', ')}`,timestamp:exception.createdAt,isRead:false,actionUrl:'/app/admin/work-date-exceptions'};
-    setNotifications(prev=>prev.some(x=>x.id===n.id)?prev:[n,...prev]);
+  const refreshExceptions = async () => {
+    try {
+      const response = await fetch('/api/work-date-exceptions', { credentials: 'include' });
+      const payload = await response.json() as { exceptions?: WorkDateException[] };
+      if (response.ok && payload.exceptions) setExceptions(payload.exceptions);
+    } catch { /* show the existing server-backed list on the next load */ }
   };
-  const revokeException = (id:string) => {setExceptions(prev=>{const next=prev.map(x=>x.id===id?{...x,revokedAt:'2026-10-31 09:15 AM'}:x);try{localStorage.setItem('demo_work_exceptions',JSON.stringify(next));}catch{}return next;});};
-
+  const addException = (exception: WorkDateException) => {
+    void fetch('/api/work-date-exceptions', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: exception.userId, workDate: exception.dates[0], reason: exception.reason }),
+    }).then(async response => {
+      const payload = await response.json() as { message?: string };
+      if (!response.ok) throw new Error(payload.message || 'تعذر حفظ الاستثناء.');
+      await refreshExceptions();
+    }).catch(cause => window.alert(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.'));
+  };
+  const revokeException = (id: string) => {
+    void fetch(`/api/work-date-exceptions/${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'include' })
+      .then(async response => { const payload = await response.json() as { message?: string }; if (!response.ok) throw new Error(payload.message || 'تعذر إلغاء الاستثناء.'); await refreshExceptions(); })
+      .catch(cause => window.alert(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.'));
+  };
   const t = translations[language];
 
   return (

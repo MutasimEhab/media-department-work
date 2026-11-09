@@ -16,6 +16,9 @@ import notificationsRouter from './routes/notifications.js';
 import systemSettingsRouter from './routes/system-settings.js';
 import rolePermissionsRouter from './routes/role-permissions.js';
 import accountTypesRouter from './routes/account-types.js';
+import auditLogsRouter from './routes/audit-logs.js';
+import systemHealthRouter from './routes/system-health.js';
+import reportsRouter from './routes/reports.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -44,6 +47,9 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/system-settings', systemSettingsRouter);
 app.use('/api/role-permissions', rolePermissionsRouter);
 app.use('/api/account-types', accountTypesRouter);
+app.use('/api/audit-logs', auditLogsRouter);
+app.use('/api/system-health', systemHealthRouter);
+app.use('/api/reports', reportsRouter);
 
 app.get('/api/health', async (_request, response) => {
   try {

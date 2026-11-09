@@ -12,11 +12,13 @@ export const Profile: React.FC = () => {
   const [mobile, setMobile] = useState(currentUser.mobile || '');
   const [avatar, setAvatar] = useState(currentUser.avatar || '');
   const [saving, setSaving] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState('');
-  const dirty = name !== currentUser.arabicName || mobile !== (currentUser.mobile || '') || avatar !== (currentUser.avatar || '') || Boolean(password || confirm);
+  const dirty = name !== currentUser.arabicName || mobile !== (currentUser.mobile || '') || avatar !== (currentUser.avatar || '');
 
   useEffect(() => {
     if (!dirty) return;
@@ -49,9 +51,6 @@ export const Profile: React.FC = () => {
   }
 
   async function save() {
-    if ((password || confirm) && password.length < 9) { setMessage('يجب أن تتكون كلمة المرور من 9 أحرف أو أرقام على الأقل.'); return; }
-    if (password !== confirm) { setMessage('كلمتا المرور غير متطابقتين.'); return; }
-    if (password || confirm) { setMessage('حفظ كلمة المرور غير متاح بعد؛ الاسم ورقم الاتصال والصورة تُحفظ في الحساب.'); return; }
     setSaving(true);
     try {
       const response = await fetch('/api/users/me/profile', { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arabicName: name, mobile, avatar: avatar || null }) });
@@ -59,10 +58,28 @@ export const Profile: React.FC = () => {
       if (!response.ok) throw new Error(payload.message || 'تعذر حفظ الملف الشخصي.');
       const ok = updateUser({ ...currentUser, arabicName: name, englishName: name, mobile, avatar: avatar || undefined, preferredLanguage: 'ar' });
       setMessage(ok ? 'تم حفظ الملف الشخصي.' : 'تعذر تحديث بيانات العرض.');
-      setPassword(''); setConfirm('');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'تعذر الاتصال بالخادم.');
     } finally { setSaving(false); }
+  }
+
+  async function changePassword() {
+    if (!currentPassword) { setMessage('أدخل كلمة المرور الحالية.'); return; }
+    if (password.length < 9) { setMessage('يجب أن تتكون كلمة المرور الجديدة من 9 أحرف أو أرقام على الأقل.'); return; }
+    if (password !== confirm) { setMessage('كلمتا المرور الجديدتان غير متطابقتين.'); return; }
+    setPasswordSaving(true);
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword: password }),
+      });
+      const payload = await response.json() as { message?: string };
+      if (!response.ok) throw new Error(payload.message || 'تعذر تغيير كلمة المرور.');
+      setCurrentPassword(''); setPassword(''); setConfirm('');
+      setMessage(payload.message || 'تم تغيير كلمة المرور بنجاح.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'تعذر الاتصال بالخادم.');
+    } finally { setPasswordSaving(false); }
   }
 
   return <main className="mx-auto max-w-3xl space-y-4" dir="rtl">
@@ -77,9 +94,9 @@ export const Profile: React.FC = () => {
       <label className="text-sm">رقم الاتصال<input className="mt-1 block w-full rounded-input border border-brand-border p-3" dir="ltr" value={mobile} onChange={e=>setMobile(e.target.value)}/></label>
       <div className="rounded-lg border border-brand-border bg-brand-lightGray/40 p-3 text-sm"><b>لغة الواجهة</b><p className="mt-1">العربية</p></div>
     </div></Card>
-    <Card title="تغيير كلمة المرور التجريبية"><label className="block text-sm">كلمة المرور الجديدة<span className="mt-1 flex gap-2"><input className="flex-1 rounded-input border border-brand-border p-3" dir="ltr" type={showPassword?'text':'password'} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/><button type="button" aria-label="إظهار أو إخفاء كلمة المرور" onClick={()=>setShowPassword(value=>!value)}>{showPassword?<EyeOff/>:<Eye/>}</button></span></label><label className="mt-3 block text-sm">تأكيد كلمة المرور<input className="mt-1 block w-full rounded-input border border-brand-border p-3" dir="ltr" type={showPassword?'text':'password'} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label><p className="mt-2 text-xs text-brand-charcoal">تغيير كلمة المرور غير مرتبط بخادم في النسخة الحالية.</p></Card>
+    <Card title="تغيير كلمة المرور"><label className="block text-sm">كلمة المرور الحالية<input className="mt-1 block w-full rounded-input border border-brand-border p-3" dir="ltr" type="password" autoComplete="current-password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)}/></label><label className="mt-3 block text-sm">كلمة المرور الجديدة<span className="mt-1 flex gap-2"><input className="flex-1 rounded-input border border-brand-border p-3" dir="ltr" type={showPassword?'text':'password'} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/><button type="button" aria-label="إظهار أو إخفاء كلمة المرور" onClick={()=>setShowPassword(value=>!value)}>{showPassword?<EyeOff/>:<Eye/>}</button></span></label><label className="mt-3 block text-sm">تأكيد كلمة المرور<input className="mt-1 block w-full rounded-input border border-brand-border p-3" dir="ltr" type={showPassword?'text':'password'} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)}/></label><p className="mt-2 text-xs text-brand-charcoal">يجب أن تكون 9 أحرف أو أرقام على الأقل.</p><Button className="mt-3" disabled={passwordSaving} onClick={()=>void changePassword()}>{passwordSaving?'جارٍ التغيير…':'تغيير كلمة المرور'}</Button></Card>
     <Card title="الجلسة والإشعارات"><p>الدور الوظيفي: {t.roles[currentUser.role]}</p><p className="mt-1">الإشعارات المرتبطة بالحساب: {notifications.filter(item=>item.userId===currentUser.id).length}</p><Button className="mt-3" variant="outline" onClick={()=>{signOut();navigate('/auth/login')}}>تسجيل الخروج</Button></Card>
     {message&&<p role="status" className="rounded-lg border border-brand-border bg-white p-3 text-sm">{message}</p>}
-    <div className="flex gap-2"><Button disabled={saving} onClick={()=>void save()}>{saving?'جارٍ الحفظ…':'حفظ التغييرات'}</Button><Button variant="outline" disabled={saving} onClick={()=>{setName(currentUser.arabicName);setMobile(currentUser.mobile||'');setAvatar(currentUser.avatar||'');setPassword('');setConfirm('');setMessage('')}}>إلغاء التعديلات</Button><Link className="self-center text-sm text-brand-plum underline" to="/app">العودة إلى النظام</Link></div>
+    <div className="flex gap-2"><Button disabled={saving} onClick={()=>void save()}>{saving?'جارٍ الحفظ…':'حفظ التغييرات'}</Button><Button variant="outline" disabled={saving} onClick={()=>{setName(currentUser.arabicName);setMobile(currentUser.mobile||'');setAvatar(currentUser.avatar||'');setCurrentPassword('');setPassword('');setConfirm('');setMessage('')}}>إلغاء التعديلات</Button><Link className="self-center text-sm text-brand-plum underline" to="/app">العودة إلى النظام</Link></div>
   </main>;
 };
