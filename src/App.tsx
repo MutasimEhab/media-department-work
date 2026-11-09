@@ -15,6 +15,7 @@ import { CircularTracking } from './pages/circulars/CircularTracking';
 import { NotificationCenter } from './pages/notifications/NotificationCenter';
 import { Reports } from './pages/reports/Reports';
 import { AdminPages } from './pages/admin/AdminPages';
+import { AuditLog } from './pages/admin/AuditLog';
 import { SystemHealth } from './pages/admin/SystemHealth';
 import { AdminTools } from './pages/admin/AdminTools';
 import { RecordsExport } from './pages/admin/RecordsExport';
@@ -79,7 +80,7 @@ export const App: React.FC = () => {
             <Route path="admin/custom-fields" element={<PermissionGuard permission="manage_system_settings"><AdminTools /></PermissionGuard>} />
             <Route path="admin/backup" element={<PermissionGuard permission="manage_system_settings"><AdminTools /></PermissionGuard>} />
             <Route path="my-exceptions" element={<PermissionGuard permission="view_own_exceptions"><AdminPages /></PermissionGuard>} />
-            <Route path="admin/audit" element={<PermissionGuard permission="view_audit_log"><AdminPages /></PermissionGuard>} />
+            <Route path="admin/audit" element={<PermissionGuard permission="view_audit_log"><AuditLog /></PermissionGuard>} />
             <Route path="admin/health" element={<PermissionGuard permission="view_system_health"><SystemHealth /></PermissionGuard>} />
             <Route path="admin/deliveries" element={<PermissionGuard permission="view_system_health"><SystemHealth /></PermissionGuard>} />
             <Route path="notifications" element={<PermissionGuard permission="view_notifications"><NotificationCenter /></PermissionGuard>} />
@@ -92,7 +93,7 @@ export const App: React.FC = () => {
 
             <Route path="settings" element={<PermissionGuard permission="manage_system_settings"><AdminPages /></PermissionGuard>} />
 
-            <Route path="audit-log" element={<PermissionGuard permission="view_audit_log"><AdminPages /></PermissionGuard>} />
+            <Route path="audit-log" element={<PermissionGuard permission="view_audit_log"><AuditLog /></PermissionGuard>} />
 
             <Route path="system-health" element={<PermissionGuard permission="view_system_health"><SystemHealth /></PermissionGuard>} />
 

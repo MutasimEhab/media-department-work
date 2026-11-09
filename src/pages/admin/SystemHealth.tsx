@@ -1,35 +1,63 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Activity, Bell, BriefcaseBusiness, ClipboardList, FolderKanban, Users } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
 
-type Delivery = { id: string; notice: string; recipient: string; channel: 'داخلي'|'بريد إلكتروني'|'رسالة نصية'; status: 'فشل'|'قيد الإرسال'|'تم الإرسال'|'تعذر التسليم'; attempts: number; time: string };
+type HealthMetrics = {
+  activeUsers: number;
+  workLogs: number;
+  assignments: number;
+  projects: number;
+  notifications: number;
+  unreadNotifications: number;
+  latestActivity: string | null;
+  databaseTime: string;
+};
 
 export const SystemHealth: React.FC = () => {
-  const { notifications, users, canAccess } = useApp();
-  const [tab, setTab] = useState<'health'|'delivery'>('health');
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('');
-  const [rows, setRows] = useState<Delivery[]>(()=>notifications.slice(0,6).map((item,index)=>({
-    id:item.id, notice:item.titleAr, recipient:users.find(user=>user.id===item.userId)?.arabicName||'مستخدم تجريبي',
-    channel:index%3===0?'بريد إلكتروني':'داخلي', status:index%4===0?'فشل':index%3===0?'قيد الإرسال':'تم الإرسال',
-    attempts:index%2+1,time:item.timestamp,
-  })));
-  const filtered = useMemo(()=>rows.filter(row=>(!query||`${row.notice} ${row.recipient} ${row.id}`.includes(query))&&(!status||row.status===status)),[rows,query,status]);
-  if(!canAccess('view_system_health')) return <Card>لا تملك صلاحية عرض حالة النظام.</Card>;
+  const { canAccess } = useApp();
+  const [metrics, setMetrics] = useState<HealthMetrics | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const response = await fetch('/api/system-health', { credentials: 'include' });
+      const payload = await response.json() as { metrics?: HealthMetrics; message?: string };
+      if (!response.ok || !payload.metrics) throw new Error(payload.message || 'تعذر تحميل مؤشرات النظام.');
+      setMetrics(payload.metrics);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { if (canAccess('view_system_health')) void load(); }, [canAccess, load]);
+  if (!canAccess('view_system_health')) return <Card>لا تملك صلاحية عرض حالة النظام.</Card>;
+
+  const tiles = [
+    { label: 'الحسابات النشطة', value: metrics?.activeUsers, icon: Users },
+    { label: 'سجلات العمل المحفوظة', value: metrics?.workLogs, icon: ClipboardList },
+    { label: 'التكليفات', value: metrics?.assignments, icon: BriefcaseBusiness },
+    { label: 'المشاريع', value: metrics?.projects, icon: FolderKanban },
+    { label: 'الإشعارات الداخلية', value: metrics?.notifications, icon: Bell },
+    { label: 'إشعارات غير مقروءة', value: metrics?.unreadNotifications, icon: Activity },
+  ];
 
   return <main className="space-y-5" dir="rtl">
-    <header className="app-page-heading"><h1 className="mt-2 text-2xl font-bold">حالة النظام وسجل الإرسال</h1><p>مؤشرات تشغيلية توضيحية وسجل تجريبي لقنوات الإشعار.</p></header>
-    <nav className="flex gap-2"><Button variant={tab==='health'?'secondary':'outline'} onClick={()=>setTab('health')}>مؤشرات النظام</Button><Button variant={tab==='delivery'?'secondary':'outline'} onClick={()=>setTab('delivery')}>سجل الإرسال</Button></nav>
-    {tab==='health'?<>
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
-        ['آخر نسخة احتياطية تجريبية','٢٠٢٦/١٠/٣١ · ٠٢:٠٠ ص'],['مهام قائمة الانتظار','٣'],['إشعارات تعذر إرسالها','٢'],['حالة التطبيق','يعمل ضمن المعاينة'],
-      ].map(([label,value])=><Card key={label}><b>{label}</b><p className="mt-2 text-xl">{value}</p><small>آخر تحديث: ٢٠٢٦/١٠/٣١ · ٠٩:١٥ ص</small></Card>)}</section>
-      <Card><p className="font-bold">تنبيه: مؤشرات الصحة والنسخ الاحتياطية في هذه الصفحة توضيحية فقط.</p><p className="mt-2">لا توجد خدمة مراقبة أو نسخ احتياطي متصلة؛ لا يمكن استعادة نسخة احتياطية من هذه الواجهة.</p></Card>
-      <details><summary className="cursor-pointer">تفاصيل تقنية للمعاينة</summary><pre className="mt-2 whitespace-pre-wrap" dir="rtl">موصل قائمة الانتظار: داخل الذاكرة · إعادة المحاولة: محاكاة · منع التكرار: معرّف إشعار ثابت</pre></details>
-    </>:<>
-      <Card><div className="grid gap-3 sm:grid-cols-2"><input className="rounded-input border border-brand-border p-2" value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث في الإشعار أو المستلم"/><select className="rounded-input border border-brand-border p-2" value={status} onChange={e=>setStatus(e.target.value)}><option value="">كل الحالات</option>{['قيد الإرسال','تم الإرسال','فشل','تعذر التسليم'].map(value=><option key={value}>{value}</option>)}</select></div><p className="mt-3 text-sm">تعذر إرسال البريد أو الرسائل لا يؤثر على الإشعارات الداخلية. جميع الحالات المعروضة تجريبية.</p></Card>
-      <div className="space-y-3">{filtered.map(row=><Card key={row.id}><div className="flex flex-wrap items-center justify-between gap-3"><div><b>{row.notice} · {row.id}</b><p>{row.recipient} · {row.channel} · {row.status} · عدد المحاولات: {row.attempts}</p><time dir="ltr">{row.time}</time>{row.status==='فشل'&&<p className="text-sm">الخطأ: تعذّر الإرسال في المحاكاة.</p>}</div>{['فشل','قيد الإرسال'].includes(row.status)&&<Button size="sm" onClick={()=>setRows(previous=>previous.map(item=>item.id===row.id?{...item,status:'قيد الإرسال',attempts:item.attempts+1,time:'2026-10-31 09:15 AM'}:item))}>إعادة المحاولة تجريبيًا</Button>}</div></Card>)}{!filtered.length&&<Card>لا توجد نتائج مطابقة.</Card>}</div>
-    </>}
+    <header className="app-page-heading flex flex-wrap items-center justify-between gap-3">
+      <div><h1 className="mt-2 text-2xl font-bold">صحة النظام</h1><p>مؤشرات مباشرة من قاعدة البيانات.</p></div>
+      <Button variant="outline" disabled={loading} onClick={() => void load()}>{loading ? 'جارٍ التحديث…' : 'تحديث المؤشرات'}</Button>
+    </header>
+    {error && <Card><p role="alert">{error}</p></Card>}
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{tiles.map(({ label, value, icon: Icon }) => <Card key={label}><div className="flex items-center justify-between gap-3"><span>{label}</span><Icon className="text-brand-plum" size={20}/></div><b className="mt-3 block text-2xl" dir="ltr">{value ?? '—'}</b></Card>)}</section>
+    <Card title="اتصال قاعدة البيانات">
+      <p className="font-bold">{metrics ? 'متصل بقاعدة Neon' : loading ? 'جارٍ التحقق…' : 'غير متاح'}</p>
+      {metrics?.databaseTime && <p className="mt-2 text-sm">آخر تحقق: <time dir="ltr">{new Date(metrics.databaseTime).toLocaleString('en-GB')}</time></p>}
+      <p className="mt-2 text-sm">آخر حدث مسجل: {metrics?.latestActivity ? <time dir="ltr">{new Date(metrics.latestActivity).toLocaleString('en-GB')}</time> : 'لا توجد أحداث مسجلة.'}</p>
+    </Card>
+    <Card title="سجل التدقيق"><p>يعرض العمليات المسجلة فعلياً، وتُحفظ التعديلات التي يدعمها النظام في قاعدة البيانات.</p><Link className="mt-3 inline-block text-brand-plum underline" to="/app/audit-log">فتح سجل التدقيق</Link></Card>
+    <Card title="التنبيهات الخارجية والنسخ الاحتياطي"><p>البريد وSMS غير مفعّلين لعدم ربط مزود إرسال. النسخ الاحتياطي الآمن يتم إعداده من Neon؛ هذه الصفحة لا تدّعي وجود نسخة احتياطية لم تُنشأ.</p></Card>
   </main>;
 };

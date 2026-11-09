@@ -5,10 +5,13 @@ export interface User {
   arabicName: string;
   englishName: string;
   role: UserRole;
+  accountTypeCode?: string;
+  accountTypeNameAr?: string;
   jobTitleAr: string;
   jobTitleEn: string;
   username?: string;
-  email: string;
+  employeeNumber?: string;
+  email?: string;
   avatar?: string;
   isActive: boolean;
   departmentAr: string;
@@ -82,6 +85,7 @@ export interface Project {
   ownerId: string;
   ownerNameAr: string;
   ownerNameEn: string;
+  memberIds?: string[];
   status: 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD' | 'CLOSED';
   expectedEndDate?: string;
   startedAt?: string;
@@ -95,6 +99,7 @@ export interface CircularRecipient {
   userNameEn: string;
   hasAcknowledged: boolean;
   acknowledgedAt?: string; // e.g. "09:05 AM"
+  reminderCount?: number;
 }
 
 export interface Circular {
@@ -107,9 +112,12 @@ export interface Circular {
   issuerNameAr: string;
   issuerNameEn: string;
   issuedAt: string; // e.g. "2026-10-31 08:30 AM"
-  targetAudience: 'EMPLOYEES_ONLY' | 'MANAGEMENT_ONLY' | 'EVERYONE';
+  targetAudience: 'EMPLOYEES_ONLY' | 'MANAGEMENT_ONLY' | 'EVERYONE' | 'SPECIFIC';
   isDraft: boolean;
   recipients: CircularRecipient[];
+  parentId?: string;
+  emailDelivery?: boolean;
+  smsDelivery?: boolean;
 }
 
 export type WorkLocation = 'OFFICE' | 'FIELD';

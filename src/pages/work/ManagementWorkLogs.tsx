@@ -1,4 +1,87 @@
-import React,{useMemo,useState}from'react';import{Card}from'../../components/ui/Card';import{Table}from'../../components/ui/Table';import{Button}from'../../components/ui/Button';import{useApp}from'../../context/AppContext';import{useEscapeKey}from'../../hooks/useEscapeKey';
-export const ManagementWorkLogs:React.FC=()=>{const{language,workLogs,users,tasks,projects,frozenDate}=useApp();const ar=language==='ar',tx=(a:string,e:string)=>ar?a:e;const[q,setQ]=useState(''),[employee,setEmployee]=useState(''),[month,setMonth]=useState(''),[date,setDate]=useState(''),[mode,setMode]=useState(''),[detail,setDetail]=useState<any>(null),[state,setState]=useState('ready');useEscapeKey(Boolean(detail),()=>setDetail(null));const rows=useMemo(()=>workLogs.filter(x=>(!q||`${x.activityAr} ${x.activityEn} ${x.area||''}`.toLowerCase().includes(q.toLowerCase()))&&(!employee||x.userId===employee)&&(!month||x.date.startsWith(month))&&(!date||x.date===date)&&(!mode||x.location===mode)),[workLogs,q,employee,month,date,mode,frozenDate]);const day=workLogs.filter(x=>x.date===frozenDate);const todayEmployees=new Set(day.map(x=>x.userId));const cols=[{key:'person',header:tx('الموظف','Employee'),render:(x:any)=>{const u=users.find(u=>u.id===x.userId);return <span>{u?.[ar?'arabicName':'englishName']} · {u?.[ar?'jobTitleAr':'jobTitleEn']}</span>}},{key:'date',header:tx('التاريخ','Date')},{key:'activityAr',header:tx('طبيعة العمل','Work')},{key:'area',header:tx('المنطقة','Area')},{key:'location',header:tx('النمط','Mode'),render:(x:any)=>x.location==='OFFICE'?tx('مكتب','Office'):tx('ميدان','Field')},{key:'rel',header:tx('مرتبط بـ','Related'),render:(x:any)=><span>{x.projectId?projects.find(p=>p.id===x.projectId)?.[ar?'titleAr':'titleEn']:x.relatedTaskId?tasks.find(t=>t.id===x.relatedTaskId)?.[ar?'titleAr':'titleEn']:'—'}</span>},{key:'time',header:tx('وقت الإدخال','Entered at'),render:(x:any)=><span dir="ltr">{x.time}</span>},{key:'detail',header:tx('التفاصيل','Details'),render:(x:any)=><Button size="sm" variant="outline" onClick={()=>setDetail(x)}>{tx('عرض','View')}</Button>}];return <main className="space-y-5"><header className="app-page-heading"><h1 className="text-2xl font-bold mt-2">{tx('سجلات عمل الموظفين','Employee work logs')}</h1><p>{tx('سجلات الموظفين للقراءة فقط. لا تتطلب اعتماداً ولا يمكن للإدارة إنشاء سجل نيابة عن موظف.','Read-only employee-submitted entries. No approval is required; management cannot create entries for staff.')}</p></header><div className="grid sm:grid-cols-3 gap-3"><Card><b>{tx('مسجلو اليوم','Today’s active loggers')}</b><p className="text-2xl">{todayEmployees.size}</p></Card><Card><b>{tx('لم يسجلوا اليوم','No submission today')}</b><p>{users.filter(u=>u.role==='EMPLOYEE'&&u.isActive&&!workLogs.some(log=>log.userId===u.id&&log.date===frozenDate)).map(u=>u[ar?'arabicName':'englishName']).join('، ')}</p></Card><Card><Button variant="outline" onClick={()=>alert(tx('معاينة تصدير تجريبية فقط؛ لا يتم تنزيل ملف.','Demo export preview only; no file downloaded.'))}>{tx('معاينة التصدير','Export preview')}</Button></Card></div><Card><div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"><input className="border rounded p-2" placeholder={tx('بحث بالكلمة أو المنطقة','Search keyword or area')} value={q} onChange={e=>setQ(e.target.value)}/><select className="border rounded p-2" value={employee} onChange={e=>setEmployee(e.target.value)}><option value="">{tx('كل الموظفين','All employees')}</option>{users.filter(u=>u.role==='EMPLOYEE').map(u=><option key={u.id} value={u.id}>{u[ar?'arabicName':'englishName']}</option>)}</select><input type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM" className="border rounded p-2" value={month} onChange={e=>setMonth(e.target.value)}/><input type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD" className="border rounded p-2" value={date} onChange={e=>setDate(e.target.value)}/><select className="border rounded p-2" value={mode} onChange={e=>setMode(e.target.value)}><option value="">{tx('مكتب وميدان','Office and field')}</option><option value="OFFICE">{tx('مكتب','Office')}</option><option value="FIELD">{tx('ميدان','Field')}</option></select></div></Card><details className="rounded-card border border-brand-border/80 bg-white/70 px-4 py-2.5"><summary className="cursor-pointer text-xs font-subheading text-brand-charcoal">{tx('معاينة حالات العرض','Preview display states')}</summary><div className="flex flex-wrap gap-2 pt-2">{['ready','loading','error'].map(x=><Button key={x} size="sm" variant={state===x?'secondary':'outline'} onClick={()=>setState(x)}>{({ready:'جاهز',loading:'جارٍ التحميل',error:'خطأ'} as any)[x]}</Button>)}</div></details>{state==='error'?<Card>{tx('تعذر تحميل السجلات.','Could not load logs.')}</Card>:<><div className="hidden md:block"><Table columns={cols} data={rows} keyExtractor={x=>x.id} isLoading={state==='loading'} emptyMessage={tx('لا توجد سجلات مطابقة.','No matching records.')}/></div><div className="md:hidden space-y-3">{rows.map(x=><Card key={x.id}><b>{users.find(u=>u.id===x.userId)?.[ar?'arabicName':'englishName']}</b><p dir="ltr">{x.date} · {x.time}</p><p>{ar?x.activityAr:x.activityEn} · {x.area||'—'}</p><Button size="sm" variant="outline" onClick={()=>setDetail(x)}>{tx('التفاصيل','Details')}</Button></Card>)}</div></>}{detail&&<div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><Card className="w-full max-w-lg" title={`${detail.id} · ${detail.date}`} action={<button onClick={()=>setDetail(null)}>×</button>}><p>{ar?detail.activityAr:detail.activityEn}</p><p>{detail.area} · {detail.location} · {detail.time}</p>{detail.outputLink&&<a className="underline" href={detail.outputLink}>{tx('رابط المخرجات التجريبي','Demo output link')}</a>}</Card></div>}</main>};
+import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
+import { Table } from '../../components/ui/Table';
+import { useApp } from '../../context/AppContext';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { User, WorkLog } from '../../types';
 
+interface DatabaseUsersResponse { users?: User[]; message?: string }
+interface WorkLogsResponse { workLogs?: WorkLog[]; message?: string }
 
+export const ManagementWorkLogs: React.FC = () => {
+  const { language, frozenDate } = useApp();
+  const tx = (arabic: string, english: string) => language === 'ar' ? arabic : english;
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [query, setQuery] = useState('');
+  const [employee, setEmployee] = useState('');
+  const [month, setMonth] = useState('');
+  const [date, setDate] = useState('');
+  const [mode, setMode] = useState('');
+  const [detail, setDetail] = useState<WorkLog | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEscapeKey(Boolean(detail), () => setDetail(null));
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      fetch('/api/work-logs/department', { credentials: 'include' }),
+      fetch('/api/users', { credentials: 'include' }),
+    ]).then(async ([logsResponse, usersResponse]) => {
+      const [logsPayload, usersPayload] = await Promise.all([
+        logsResponse.json() as Promise<WorkLogsResponse>,
+        usersResponse.json() as Promise<DatabaseUsersResponse>,
+      ]);
+      if (!logsResponse.ok) throw new Error(logsPayload.message || 'تعذر تحميل سجلات الدائرة.');
+      if (!usersResponse.ok) throw new Error(usersPayload.message || 'تعذر تحميل قائمة الموظفين.');
+      if (cancelled) return;
+      setWorkLogs(logsPayload.workLogs || []);
+      setUsers((usersPayload.users || []).filter(user => user.role === 'EMPLOYEE'));
+      setError('');
+    }).catch(cause => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const rows = useMemo(() => workLogs.filter(log =>
+    (!query || `${log.userNameAr} ${log.activityAr} ${log.area || ''}`.toLowerCase().includes(query.toLowerCase()))
+    && (!employee || log.userId === employee)
+    && (!month || log.date.startsWith(month))
+    && (!date || log.date === date)
+    && (!mode || log.location === mode)), [workLogs, query, employee, month, date, mode]);
+  const todayLogs = workLogs.filter(log => log.date === frozenDate);
+  const todayEmployees = new Set(todayLogs.map(log => log.userId));
+  const nonSubmitters = users.filter(user => user.isActive && !todayEmployees.has(user.id));
+
+  const columns = [
+    { key: 'person', header: tx('الموظف', 'Employee'), render: (log: WorkLog) => <span>{log.userNameAr} · {users.find(user => user.id === log.userId)?.jobTitleAr || ''}</span> },
+    { key: 'date', header: tx('التاريخ', 'Date') },
+    { key: 'activityAr', header: tx('تفاصيل العمل', 'Work details') },
+    { key: 'area', header: tx('المنطقة', 'Area') },
+    { key: 'location', header: tx('النمط', 'Mode'), render: (log: WorkLog) => log.location === 'OFFICE' ? tx('مكتب', 'Office') : tx('ميدان', 'Field') },
+    { key: 'time', header: tx('وقت الإدخال', 'Entered at'), render: (log: WorkLog) => <span dir="ltr">{log.time}</span> },
+    { key: 'detail', header: tx('التفاصيل', 'Details'), render: (log: WorkLog) => <Button size="sm" variant="outline" onClick={() => setDetail(log)}>{tx('عرض', 'View')}</Button> },
+  ];
+
+  return <main className="space-y-5">
+    <header className="app-page-heading"><h1 className="mt-2 text-2xl font-bold">{tx('سجلات عمل الموظفين', 'Employee work logs')}</h1><p>{tx('سجلات الموظفين للقراءة فقط؛ يحتفظ كل موظف بحق تعديل سجلاته وحذفها.', 'Employee logs are read-only for management. Each employee manages their own records.')}</p></header>
+    <div className="grid gap-3 sm:grid-cols-3"><Card><b>{tx('مسجلو اليوم', 'Today’s active loggers')}</b><p className="text-2xl">{todayEmployees.size}</p></Card><Card><b>{tx('لم يسجلوا اليوم', 'No submission today')}</b><p>{nonSubmitters.map(user => user.arabicName).join('، ') || tx('سجل الجميع.', 'Everyone has submitted.')}</p></Card><Card><Button variant="outline" onClick={() => window.print()}>{tx('طباعة الكشف', 'Print report')}</Button></Card></div>
+    <Card><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <input className="rounded-input border border-brand-border p-2" placeholder={tx('بحث بالموظف أو التفاصيل أو المنطقة', 'Search employee, details or area')} value={query} onChange={event => setQuery(event.target.value)} />
+      <select className="rounded-input border border-brand-border p-2" value={employee} onChange={event => setEmployee(event.target.value)}><option value="">{tx('كل الموظفين', 'All employees')}</option>{users.map(user => <option key={user.id} value={user.id}>{user.arabicName}</option>)}</select>
+      <input type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM" className="rounded-input border border-brand-border p-2" value={month} onChange={event => setMonth(event.target.value)} />
+      <input type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD" className="rounded-input border border-brand-border p-2" value={date} onChange={event => setDate(event.target.value)} />
+      <select className="rounded-input border border-brand-border p-2" value={mode} onChange={event => setMode(event.target.value)}><option value="">{tx('مكتب وميدان', 'Office and field')}</option><option value="OFFICE">{tx('مكتب', 'Office')}</option><option value="FIELD">{tx('ميدان', 'Field')}</option></select>
+    </div></Card>
+    {loading ? <Card>{tx('جارٍ تحميل السجلات…', 'Loading work logs…')}</Card> : error ? <Card><p role="alert" className="text-red-700">{error}</p></Card> : <>
+      <p className="text-sm text-brand-charcoal/70">{tx('عدد السجلات المطابقة', 'Matching records')}: {rows.length}</p>
+      <div className="hidden md:block"><Table columns={columns} data={rows} keyExtractor={log => log.id} emptyMessage={tx('لا توجد سجلات مطابقة.', 'No matching records.')} /></div>
+      <div className="space-y-3 md:hidden">{rows.map(log => <Card key={log.id}><b>{log.userNameAr}</b><p dir="ltr">{log.date} · {log.time}</p><p>{log.activityAr} · {log.area || '—'}</p><Button size="sm" variant="outline" onClick={() => setDetail(log)}>{tx('التفاصيل', 'Details')}</Button></Card>)}</div>
+    </>}
+    {detail && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetail(null); }}><Card className="w-full max-w-lg" title={`${detail.userNameAr} · ${detail.date}`} action={<button onClick={() => setDetail(null)}>×</button>}><p dir="ltr">{detail.time}</p><p className="font-bold">{detail.activityAr}</p><p>{detail.area} · {detail.location === 'OFFICE' ? tx('مكتبي', 'Office') : tx('ميداني', 'Field')}</p>{detail.outputLink && <a className="underline text-brand-plum" href={detail.outputLink} target="_blank" rel="noreferrer">{tx('رابط المخرجات', 'Output link')}</a>}<p className="border-t border-brand-border pt-3 text-sm">{tx('عرض فقط؛ لا يمكن تعديل سجل موظف أو حذفه من هذه الشاشة.', 'Read-only: management cannot edit or delete an employee entry here.')}</p></Card></div>}
+  </main>;
+};

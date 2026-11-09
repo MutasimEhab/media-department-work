@@ -13,5 +13,14 @@ export default defineConfig({
   server: {
     port: 3000,
     open: false,
+    watch: {
+      ignored: ['**/reference-assets/**'],
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
   },
 });

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Wifi, WifiOff, Search, Sun, Moon } from 'lucide-react';
+import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Wifi, WifiOff, Search, Sun, Moon, Sparkles, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
@@ -9,6 +9,8 @@ export const Topbar: React.FC = () => {
   const {
     language,
     currentUser,
+    welcomeGreetingOpen,
+    dismissWelcomeGreeting,
     signOut,
     unreadNotificationCount,
     notifications,
@@ -33,6 +35,12 @@ export const Topbar: React.FC = () => {
   const location = useLocation();
   useEscapeKey(openMenu !== null, () => setOpenMenu(null));
   useEscapeKey(searchOpen, () => { setSearchOpen(false); setSearchQuery(''); });
+  useEscapeKey(welcomeGreetingOpen, dismissWelcomeGreeting);
+  useEffect(() => {
+    if (!welcomeGreetingOpen) return;
+    const timer = window.setTimeout(dismissWelcomeGreeting, 7000);
+    return () => window.clearTimeout(timer);
+  }, [welcomeGreetingOpen, dismissWelcomeGreeting]);
   useEffect(() => setOpenMenu(null), [location.pathname]);
   useEffect(() => {
     const online = () => setIsOnline(true);
@@ -42,7 +50,6 @@ export const Topbar: React.FC = () => {
     return () => { window.removeEventListener('online', online); window.removeEventListener('offline', offline); };
   }, []);
   const navigate = useNavigate();
-
   const userNotifications = notifications.filter(n => n.userId === currentUser.id);
   const searchResults = useMemo(() => {
     const term = searchQuery.trim().toLocaleLowerCase('ar');
@@ -52,7 +59,7 @@ export const Topbar: React.FC = () => {
       ...projects.filter(project => (canAccess('manage_projects') || project.ownerId === currentUser.id) && `${project.titleAr} ${project.id}`.toLocaleLowerCase('ar').includes(term)).map(project => ({ label: project.titleAr, detail: `مشروع · ${project.id}`, href: `/app/projects/${project.id}` })),
       ...circulars.filter(item => !item.isDraft && (canAccess('manage_circulars') || item.recipients.some(recipient => recipient.userId === currentUser.id)) && `${item.titleAr} ${item.id}`.toLocaleLowerCase('ar').includes(term)).map(item => ({ label: item.titleAr, detail: `تعميم · ${item.id}`, href: '/app/circulars' })),
       ...workLogs.filter(log => (canAccess('view_department_work_logs') || log.userId === currentUser.id) && `${log.activityAr} ${log.descriptionAr || ''} ${log.id} ${log.date}`.toLocaleLowerCase('ar').includes(term)).map(log => ({ label: log.activityAr, detail: `سجل عمل · ${log.date}`, href: canAccess('view_department_work_logs') ? '/app/management/work-logs' : '/app/work' })),
-      ...(canAccess('manage_users') ? users.filter(user => `${user.arabicName} ${user.username || ''} ${user.email}`.toLocaleLowerCase('ar').includes(term)).map(user => ({ label: user.arabicName, detail: `مستخدم · ${user.username || user.email}`, href: `/app/admin/users/${user.id}` })) : []),
+      ...(canAccess('manage_users') ? users.filter(user => `${user.arabicName} ${user.username || ''} ${user.email || ''}`.toLocaleLowerCase('ar').includes(term)).map(user => ({ label: user.arabicName, detail: `مستخدم · ${user.username || user.email || 'بدون بريد'}`, href: `/app/admin/users/${user.id}` })) : []),
     ].slice(0, 8);
   }, [searchQuery, tasks, projects, circulars, workLogs, users, canAccess, currentUser.id]);
 
@@ -63,6 +70,7 @@ export const Topbar: React.FC = () => {
         <div className="min-w-0">
           <h1 className="truncate text-xs font-bold text-brand-darkText sm:text-sm">{t.app.title}</h1>
           <p className="truncate text-[10px] text-brand-charcoal/75 sm:text-[11px]">{language === 'ar' ? currentUser.departmentAr : currentUser.departmentEn} · {t.app.subTitle}</p>
+          <p className="truncate text-[10px] font-semibold text-brand-plum sm:text-[11px]">{currentUser.jobTitleAr || t.roles[currentUser.role]} · الرقم الوظيفي: <bdi dir="ltr">{currentUser.employeeNumber || '—'}</bdi></p>
         </div>
       </div>
 
@@ -172,11 +180,13 @@ export const Topbar: React.FC = () => {
             aria-expanded={openMenu === 'user'}
             className="flex items-center gap-2 p-1.5 rounded-input hover:bg-brand-lightGray focus:outline-none focus:ring-2 focus:ring-brand-plum min-h-[40px]"
           >
-            <div className="w-8 h-8 rounded-full bg-brand-plum text-white font-bold text-xs flex items-center justify-center">
-              {(language === 'ar' ? currentUser.arabicName : currentUser.englishName).charAt(0)}
+            <div className="w-8 h-8 rounded-full bg-brand-plum text-white font-bold text-xs flex items-center justify-center overflow-hidden">
+              {currentUser.avatar ? <img src={currentUser.avatar} alt="" className="h-full w-full rounded-full object-cover"/> : (language === 'ar' ? currentUser.arabicName : currentUser.englishName).charAt(0)}
             </div>
-            <span className="text-xs font-bold text-brand-darkText hidden md:inline-block">
-              {language === 'ar' ? currentUser.arabicName : currentUser.englishName}
+            <span className="hidden min-w-0 flex-col items-start md:flex">
+              <span className="max-w-40 truncate text-xs font-bold text-brand-darkText">
+                {language === 'ar' ? currentUser.arabicName : currentUser.englishName}
+              </span>
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-brand-charcoal/70 hidden md:inline-block" />
           </button>
@@ -185,7 +195,7 @@ export const Topbar: React.FC = () => {
             <div className="absolute end-0 mt-2 w-56 bg-white rounded-card border border-brand-border shadow-dialog p-2 z-50 animate-in fade-in zoom-in-95 duration-100">
               <div className="px-3 py-2 border-b border-brand-border/60">
                 <p className="text-xs font-bold text-brand-darkText">{language === 'ar' ? currentUser.arabicName : currentUser.englishName}</p>
-                <p className="text-[11px] text-brand-charcoal/70 truncate">{currentUser.email}</p>
+                <p className="text-[11px] text-brand-charcoal/70 truncate">{currentUser.email || 'البريد غير مسجل'}</p>
                 <span className="inline-block mt-1 text-[10px] bg-brand-plum/10 text-brand-plum font-semibold px-2 py-0.5 rounded">
                   {t.roles[currentUser.role]}
                 </span>
@@ -220,6 +230,27 @@ export const Topbar: React.FC = () => {
           )}
         </div>
       </div>
+      {welcomeGreetingOpen && <div dir="rtl" className="fixed inset-0 z-[60] grid place-items-center p-4 sm:p-6">
+        <div aria-hidden="true" className="welcome-backdrop absolute inset-0 bg-slate-950/40 backdrop-blur-sm" />
+        <section aria-label="رسالة ترحيب" aria-live="polite" role="status" className="welcome-greeting-panel relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-dialog ring-1 ring-black/5">
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-l from-brand-magenta via-brand-plum to-brand-magenta" />
+          <div aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-48 w-48 rounded-full bg-brand-magenta/5 blur-2xl" />
+          <button type="button" onClick={dismissWelcomeGreeting} className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-brand-lightGray/70 text-brand-charcoal transition hover:bg-brand-lightGray focus:outline-none focus:ring-2 focus:ring-brand-plum" aria-label="إغلاق رسالة الترحيب"><X className="h-4 w-4" /></button>
+          <div className="relative flex flex-col items-center px-6 pb-7 pt-9 text-center sm:px-9 sm:pb-9 sm:pt-11">
+            <div className="relative mb-5 h-[5.25rem] w-[5.25rem]">
+              <div className="absolute -inset-2 rounded-[1.8rem] bg-brand-magenta/10 blur-sm" />
+              <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[1.5rem] border border-brand-plum/15 bg-brand-plum text-3xl font-bold text-white shadow-card">
+                {currentUser.avatar ? <img src={currentUser.avatar} alt="" className="h-full w-full object-cover" /> : currentUser.arabicName.charAt(0)}
+              </div>
+              <span className="absolute -bottom-2 -left-2 flex h-8 w-8 items-center justify-center rounded-full border-[3px] border-white bg-brand-magenta text-white shadow-sm"><Sparkles className="h-3.5 w-3.5" /></span>
+            </div>
+            <p className="text-xs font-semibold text-brand-plum">مرحباً بك في نظام إدارة أعمال دائرة الإعلام</p>
+            <h2 className="mt-2 text-xl font-bold text-brand-darkText sm:text-2xl">أهلاً وسهلاً، {currentUser.arabicName}</h2>
+            <p className="mt-2 max-w-sm text-sm text-brand-charcoal">{currentUser.jobTitleAr} · نتمنى لك يوماً موفقاً.</p>
+          </div>
+          <div className="h-1 w-full bg-brand-plum/10"><div className="welcome-progress h-full bg-brand-magenta" /></div>
+        </section>
+      </div>}
       {searchOpen && <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 px-3 pt-[12vh]" onMouseDown={event => { if (event.target === event.currentTarget) { setSearchOpen(false); setSearchQuery(''); } }}>
         <section role="dialog" aria-modal="true" aria-label="بحث شامل" className="w-full max-w-2xl overflow-hidden rounded-2xl border border-brand-border bg-white shadow-dialog">
           <div className="flex items-center gap-3 border-b border-brand-border px-4 py-3"><Search size={20} className="shrink-0 text-brand-plum" /><input autoFocus value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="ابحث في التكليفات والمشاريع والتعاميم وسجلات العمل" className="min-h-11 flex-1 border-0 bg-transparent text-sm outline-none" /><button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} aria-label="إغلاق البحث" className="rounded p-2 text-brand-charcoal hover:bg-brand-lightGray">×</button></div>

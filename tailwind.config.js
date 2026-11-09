@@ -20,10 +20,10 @@ export default {
         },
       },
       fontFamily: {
-        heading: ['Advertising ExtraBold', 'Janna LT', 'sans-serif'],
-        subheading: ['Janna LT', 'sans-serif'],
-        body: ['Janna LT', 'sans-serif'],
-        sans: ['Janna LT', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        heading: ['Tajawal', 'Janna LT', 'sans-serif'],
+        subheading: ['Tajawal', 'Janna LT', 'sans-serif'],
+        body: ['IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Tajawal', 'Janna LT', 'sans-serif'],
+        sans: ['IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Tajawal', 'Janna LT', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
       },
       borderRadius: {
         badge: '6px',

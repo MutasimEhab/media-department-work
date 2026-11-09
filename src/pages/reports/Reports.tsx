@@ -1,6 +1,70 @@
-import React,{useMemo,useState}from'react';import{Card}from'../../components/ui/Card';import{Button}from'../../components/ui/Button';import{useApp}from'../../context/AppContext';import{NOOR_MONTHLY_SCORE_FIXTURE}from'../../data/mockData';import organizationLogo from'../../assets/brand/organization-logo.png';
-const demoScores=[{id:'U-005',score:84.2},{id:'U-006',score:91.1},{id:'U-007',score:78.4}];
-export const Reports:React.FC<{department?:boolean}>=({department=false})=>{const{language,currentUser,users,tasks,projects,workLogs,canAccess}=useApp();const ar=language==='ar',tx=(a:string,e:string)=>ar?a:e;const[month,setMonth]=useState('2026-10'),[person,setPerson]=useState('U-004'),[format,setFormat]=useState('screen'),[empty,setEmpty]=useState(false),[error,setError]=useState(false);const allowed=department?canAccess('view_department_reports'):canAccess('view_own_report');const rows=useMemo(()=>workLogs.filter(w=>(department?w.userId===person:w.userId===currentUser.id)&&w.date.startsWith(month)),[workLogs,department,person,currentUser,month]);if(!allowed)return <Card>{tx('غير مصرح بعرض هذا التقرير.','You are not authorized to view this report.')}</Card>;const fixture=currentUser.id==='U-004'||person==='U-004'?NOOR_MONTHLY_SCORE_FIXTURE:undefined;const scores=department?users.filter(u=>u.role==='EMPLOYEE'&&u.isActive).map(u=>({u,score:u.id==='U-004'?87.56:demoScores.find(s=>s.id===u.id)?.score,kind:u.id==='U-004'?'aggregate fixture':'illustrative aggregate'})):[];return <main className="space-y-5"><header className="app-page-heading"><span className="text-xs font-subheading text-brand-plum">{tx('التقارير الشهرية','Monthly reports')} · {department?tx('ملخص الدائرة','Department summary'):tx('ملخصي','My summary')}</span><h1 className="text-2xl font-bold mt-2">{tx(department?'تقارير الدائرة ومقارنة الموظفين':'تقاريري الشهرية',department?'Department reports':'My monthly report')}</h1></header><Card><div className="flex flex-wrap gap-3"><label>{tx('الشهر','Month')} <input type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM" className="border rounded p-2" value={month} onChange={e=>setMonth(e.target.value)}/></label>{department&&<select className="border rounded p-2" value={person} onChange={e=>setPerson(e.target.value)}>{users.filter(u=>u.role==='EMPLOYEE').map(u=><option key={u.id} value={u.id}>{ar?u.arabicName:u.englishName}</option>)}</select>}<select className="border rounded p-2" value={format} onChange={e=>setFormat(e.target.value)}><option value="screen">عرض على الشاشة</option><option value="pdf">ملف PDF</option><option value="excel">ملف Excel</option></select><Button variant="outline" onClick={()=>setEmpty(v=>!v)}>{tx('محاكاة شهر بلا بيانات','Toggle no-data month')}</Button><Button variant="outline" onClick={()=>setError(v=>!v)}>{tx('حالة التصدير','Export error')}</Button></div></Card>{error&&<Card>{tx('معاينة التصدير غير متاحة حالياً؛ لم يتم إنشاء ملف.','Export preview unavailable; no file was created.')}</Card>}{empty?<Card>{tx('لا توجد بيانات للشهر المحدد.','No records for selected month.')}</Card>:department?<><Card title={tx('ملخص الدائرة · أكتوبر 2026','Department summary · October 2026')}><p>{tx('نتائج تجميعية توضيحية مستقلة وليست مشتقة من عينة السجلات.', 'Illustrative independent aggregates, not calculated from the sample log rows.')}</p><p>{tx('مؤشر الالتزام بالمواعيد لنور','Noor on-time score')}: 88.89% · {tx('إنجاز مراحل المشاريع','Project stage totals')}: {projects.reduce((a,p)=>a+p.stages.filter(s=>s.isCompleted).length,0)}</p></Card><Card title={tx('مقارنة الموظفين','Employee comparison')}><div className="overflow-x-auto"><table className="w-full text-start"><thead><tr><th>{tx('الموظف','Employee')}</th><th>{tx('الدرجة','Score')}</th><th>{tx('المصدر','Source')}</th></tr></thead><tbody>{scores.map(x=><tr key={x.u.id}><td>{ar?x.u.arabicName:x.u.englishName}</td><td dir="ltr">{x.score?.toFixed(2)||'—'}</td><td>{x.kind}</td></tr>)}</tbody></table></div></Card><Card title={tx('التزام أيام العمل ومكتب/ميدان','Workday compliance and office/field')}><p>{tx('التزام التسجيل حسب سجلات العينة','Logged work in sample')}: {rows.length} {tx('سجلات','entries')}</p><p>{tx('مكتب','Office')}: {rows.filter(w=>w.location==='OFFICE').length} · {tx('ميدان','Field')}: {rows.filter(w=>w.location==='FIELD').length}</p></Card></>:<><Card provisionalNotice title={tx('معاينة التقرير الرسمي','Official report preview')}><div className="mb-4 flex items-center gap-4 border-b border-brand-border pb-4"><img src={organizationLogo} alt={tx('شعار المؤسسة','Organization logo')} className="w-20 h-20 object-contain"/><p className="font-subheading">{tx('مؤسسة السمع والبصر للتنمية والتأهيل المجتمعي','Hearing and Sight Foundation for Community Development and Rehabilitation')}</p></div><h2 className="text-xl font-bold">{ar?currentUser.arabicName:currentUser.englishName}</h2><p>{ar?currentUser.jobTitleAr:currentUser.jobTitleEn} · {month}</p><p>{tx('تاريخ الإصدار التجريبي','Demo issued at')}: 2026-10-31 11:30 AM</p>{fixture?<><div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">{[['الإنجاز',fixture.scoreC],['الالتزام',fixture.scoreT],['المحتوى الإعلامي',fixture.scoreS],['الإجمالي',fixture.totalScore]].map(([k,v])=><div key={String(k)} className="p-4 border rounded"><small>{k}</small><b className="block text-2xl" dir="ltr">{Number(v).toFixed(2)}%</b></div>)}</div><p className="mt-3">{tx('التقدير: جيد جداً','Rating: Very Good')} · {tx('أوزان 40/40/20 مؤقتة حتى اعتماد الشهر.','40/40/20 weights are provisional until month finalization.')}</p></>:<p>{tx('لا توجد درجة مسجلة لهذا المستخدم.','No seeded score for this user.')}</p>}</Card><Card title={tx('سجل العمل اليومي','Daily work')}><div className="space-y-2">{rows.map(w=><p key={w.id}>{w.date} · {w.time} · {ar?w.activityAr:w.activityEn}</p>)}{!rows.length&&<p>{tx('لا توجد سجلات لهذا الشهر.','No work logs this month.')}</p>}</div></Card><Card title={tx('التكليفات والمشاريع','Assignments and projects')}><p>{tasks.filter(t=>t.recipients.some(r=>r.userId===currentUser.id)&&!t.isDraft).map(t=>`${t.id} · ${t.deadline}`).join(' / ')||tx('لا توجد تكليفات.','No assignments.')}</p><p>{projects.filter(p=>p.ownerId===currentUser.id).map(p=>`${p.id} · ${p.stages.filter(s=>s.isCompleted).length}/${p.stages.length}`).join(' / ')||tx('لا توجد مشاريع.','No projects.')}</p></Card><Button onClick={()=>format==='screen'?window.print():alert(tx(`معاينة ${format.toUpperCase()} تجريبية فقط؛ لم يتم إنشاء ملف.`,`Mock ${format.toUpperCase()} preview only; no file was created.`))}>{tx('معاينة / طباعة','Preview / print')} · {format.toUpperCase()}</Button></>}</main>};
+import React, { useEffect, useMemo, useState } from 'react';
+import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { useApp } from '../../context/AppContext';
 
+type ReportLog = { id: string; userId: string; userNameAr: string; date: string; time: string; activityAr: string; location: 'OFFICE' | 'FIELD'; area: string };
+type AssignmentSummary = Record<string, { total: number; onTime: number }>;
+type ReportData = { workLogs: ReportLog[]; summary: { workLogCount: number; officeCount: number; fieldCount: number; assignments: AssignmentSummary } };
+type Employee = { id: string; arabicName: string };
 
+const STATUS_LABELS: Record<string, string> = { assigned: 'مسند', in_progress: 'قيد التنفيذ', submitted: 'مُسلّم', approved: 'معتمد', returned: 'مُعاد للتعديل' };
 
+export const Reports: React.FC<{ department?: boolean }> = ({ department = false }) => {
+  const { currentUser, canAccess } = useApp();
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [person, setPerson] = useState('');
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [data, setData] = useState<ReportData | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const allowed = department ? canAccess('view_department_reports') : canAccess('view_own_report');
+
+  useEffect(() => {
+    if (!department) return;
+    fetch('/api/users/report-employees', { credentials: 'include' })
+      .then(async response => response.ok ? await response.json() as { employees?: Employee[] } : null)
+      .then(payload => { if (payload?.employees) setEmployees(payload.employees); })
+      .catch(() => undefined);
+  }, [department]);
+
+  useEffect(() => {
+    if (!allowed) return;
+    let cancelled = false;
+    setBusy(true);
+    setError('');
+    const query = new URLSearchParams({ month, scope: department ? 'department' : 'own' });
+    if (person) query.set('userId', person);
+    fetch(`/api/reports/monthly?${query}`, { credentials: 'include' })
+      .then(async response => {
+        const payload = await response.json() as ReportData & { message?: string };
+        if (!response.ok) throw new Error(payload.message || 'تعذر تحميل التقرير.');
+        return payload;
+      })
+      .then(payload => { if (!cancelled) setData(payload); })
+      .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.'); })
+      .finally(() => { if (!cancelled) setBusy(false); });
+    return () => { cancelled = true; };
+  }, [allowed, department, month, person]);
+
+  const rows = useMemo(() => data?.workLogs ?? [], [data]);
+  if (!allowed) return <Card>لا تملك صلاحية عرض هذا التقرير.</Card>;
+  const exportCsv = () => {
+    const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const lines = [['الموظف', 'التاريخ', 'الوقت', 'التفاصيل', 'المنطقة', 'مكان العمل'].map(quote).join(','), ...rows.map(row => [row.userNameAr, row.date, row.time, row.activityAr, row.area, row.location === 'OFFICE' ? 'مكتبي' : 'ميداني'].map(quote).join(','))];
+    const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url; link.download = `تقرير-الأعمال-${month}.csv`; link.click(); URL.revokeObjectURL(url);
+  };
+
+  return <main className="space-y-5">
+    <header className="app-page-heading"><span className="text-xs font-subheading text-brand-plum">تقارير محفوظة في قاعدة البيانات</span><h1 className="mt-2 text-2xl font-bold">{department ? 'تقارير الدائرة' : 'تقاريري الشهرية'}</h1><p>{department ? 'عرض فعلي لسجلات الموظفين والتكليفات ضمن نطاق الصلاحية.' : `سجلات العمل والتكليفات المسندة إلى ${currentUser.arabicName}.`}</p></header>
+    <Card><div className="flex flex-wrap items-end gap-3"><label className="text-sm">الشهر<input type="month" dir="ltr" className="mt-1 block min-h-11 rounded-input border border-brand-border bg-transparent px-3" value={month} onChange={event => setMonth(event.target.value)} /></label>{department && <label className="text-sm">الموظف<select className="mt-1 block min-h-11 rounded-input border border-brand-border bg-transparent px-3" value={person} onChange={event => setPerson(event.target.value)}><option value="">جميع الموظفين</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.arabicName}</option>)}</select></label>}<Button variant="outline" disabled={busy || !data} onClick={exportCsv}>تنزيل CSV</Button><Button variant="outline" onClick={() => window.print()}>طباعة التقرير</Button></div></Card>
+    {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+    {busy && <Card>جارٍ تحميل بيانات التقرير المحفوظة…</Card>}
+    {!busy && data && <>
+      <div className="grid gap-3 sm:grid-cols-3"><Card title="سجلات العمل"><p className="text-3xl font-bold" dir="ltr">{data.summary.workLogCount}</p></Card><Card title="عمل مكتبي"><p className="text-3xl font-bold" dir="ltr">{data.summary.officeCount}</p></Card><Card title="عمل ميداني"><p className="text-3xl font-bold" dir="ltr">{data.summary.fieldCount}</p></Card></div>
+      {department && <Card title="حالة التكليفات المسندة في الشهر"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{Object.entries(data.summary.assignments).map(([status, summary]) => <div key={status} className="rounded-lg border border-brand-border p-3"><p>{STATUS_LABELS[status] ?? status}</p><p className="mt-2 text-xl font-bold" dir="ltr">{summary.total}</p><p className="text-xs">منها {summary.onTime} مسلمة ضمن الموعد أو قبله</p></div>)}{!Object.keys(data.summary.assignments).length && <p>لا توجد تكليفات مسندة في الشهر المحدد.</p>}</div></Card>}
+      <Card title={`سجل العمل · ${month}`}><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-sm"><thead className="bg-brand-magenta text-white"><tr><th className="p-3">الموظف</th><th className="p-3">التاريخ</th><th className="p-3">الوقت</th><th className="p-3">التفاصيل</th><th className="p-3">المنطقة</th><th className="p-3">المكان</th></tr></thead><tbody>{rows.length ? rows.map(row => <tr key={row.id} className="border-t border-brand-border"><td className="p-3">{row.userNameAr}</td><td className="p-3" dir="ltr">{row.date}</td><td className="p-3" dir="ltr">{row.time}</td><td className="p-3">{row.activityAr}</td><td className="p-3">{row.area}</td><td className="p-3">{row.location === 'OFFICE' ? 'مكتبي' : 'ميداني'}</td></tr>) : <tr><td colSpan={6} className="p-5 text-center">لا توجد سجلات لهذا الشهر.</td></tr>}</tbody></table></div></Card>
+    </>}
+  </main>;
+};

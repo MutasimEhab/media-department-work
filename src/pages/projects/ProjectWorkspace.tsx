@@ -27,7 +27,7 @@ export const ProjectWorkspace: React.FC = () => {
   const [endDate, setEndDate] = useState('2026-12-31');
   const manager = canAccess('manage_projects');
   const scoped = projects.filter(project =>
-    (manager || project.ownerId === currentUser.id) &&
+    (manager || project.ownerId === currentUser.id || project.memberIds?.includes(currentUser.id)) &&
     (!owner || project.ownerId === owner) &&
     (!status || project.status === status) &&
     (!search || `${project.titleAr} ${project.titleEn}`.toLowerCase().includes(search.toLowerCase()))
@@ -36,12 +36,12 @@ export const ProjectWorkspace: React.FC = () => {
   if (id === 'new') return <main className="max-w-3xl mx-auto space-y-4">
     <header className="app-page-heading"><h1 className="text-2xl font-bold mt-2">{tx('إنشاء مشروع','Create project')}</h1><p>{tx('أدخل بيانات المشروع بالعربية. لغة العرض لا تغيّر النص الذي تكتبه.','Enter project content in Arabic. Display language does not change your text.')}</p></header>
     <Card title={tx('بيانات المشروع','Project details')}>
-      <form className="space-y-4" onSubmit={event => {
+      <form className="space-y-4" onSubmit={async event => {
         event.preventDefault();
         if (!title.trim()) return;
         const user = users.find(candidate => candidate.id === newOwner) || currentUser;
         const projectId = `PRJ-${204 + projects.length - 3}`;
-        updateProjects(items => [...items, {
+        const result = await updateProjects(items => [...items, {
           id: projectId,
           titleAr: title.trim(), titleEn: title.trim(),
           descriptionAr: description.trim(), descriptionEn: description.trim(),
@@ -49,6 +49,7 @@ export const ProjectWorkspace: React.FC = () => {
           status: 'IN_PROGRESS', stages: [], relatedTaskId: linkedTask || undefined,
           startedAt: startDate, expectedEndDate: endDate,
         }]);
+        if (!result.ok) return;
         navigate('/app/projects');
       }}>
         <TextField label={tx('اسم المشروع','Project name')} value={title} onChange={event=>setTitle(event.target.value)} dir="rtl" requiredIndicator helperText={tx('اكتب اسم المشروع بالعربية.','Enter the project name in Arabic.')}/>
@@ -62,7 +63,7 @@ export const ProjectWorkspace: React.FC = () => {
   </main>;
 
   if (id && !selected) return <Card>المشروع غير موجود.</Card>;
-  if (id && selected && !manager && selected.ownerId !== currentUser.id) return <Card>لا تملك صلاحية عرض هذا المشروع.</Card>;
+  if (id && selected && !manager && selected.ownerId !== currentUser.id && !selected.memberIds?.includes(currentUser.id)) return <Card>لا تملك صلاحية عرض هذا المشروع.</Card>;
 
   if (selected) {
     const canEdit = manager || selected.ownerId === currentUser.id;
