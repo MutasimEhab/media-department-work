@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Wifi, WifiOff, Search, Sun, Moon } from 'lucide-react';
+import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Wifi, WifiOff, Search, Sun, Moon, Sparkles, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
@@ -230,7 +230,27 @@ export const Topbar: React.FC = () => {
           )}
         </div>
       </div>
-      {welcomeGreetingOpen && <section aria-label="رسالة ترحيب" aria-live="polite" role="status" className="fixed start-1/2 top-20 z-[60] w-[min(92vw,28rem)] -translate-x-1/2 animate-in slide-in-from-top-3 fade-in overflow-hidden rounded-2xl border border-brand-border bg-white shadow-dialog"><div className="flex items-start gap-3 p-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-brand-plum/15 bg-brand-plum text-xl font-bold text-white">{currentUser.avatar?<img src={currentUser.avatar} alt="" className="h-full w-full object-cover"/>:currentUser.arabicName.charAt(0)}</div><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-brand-plum">مرحباً بك في نظام إدارة أعمال دائرة الإعلام</p><h2 className="mt-1 truncate text-base font-bold text-brand-darkText">أهلاً وسهلاً، {currentUser.arabicName}</h2><p className="mt-1 text-xs text-brand-charcoal">{currentUser.jobTitleAr} · نتمنى لك يوماً موفقاً.</p></div><button type="button" onClick={dismissWelcomeGreeting} className="rounded-lg p-1.5 text-brand-charcoal transition hover:bg-brand-lightGray" aria-label="إغلاق رسالة الترحيب">×</button></div><div className="h-1 w-full bg-brand-plum/10"><div className="welcome-progress h-full bg-brand-magenta"/></div></section>}
+      {welcomeGreetingOpen && <div dir="rtl" className="pointer-events-none fixed inset-x-4 top-20 z-[60] flex justify-end sm:inset-x-auto sm:end-5 sm:w-[min(92vw,25rem)]">
+        <section aria-label="رسالة ترحيب" aria-live="polite" role="status" className="welcome-toast pointer-events-auto relative w-full overflow-hidden rounded-3xl border border-brand-border bg-white shadow-dialog">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-brand-magenta via-brand-plum to-brand-magenta" />
+          <div className="flex items-center gap-3 p-4 pt-5 sm:gap-4 sm:p-5 sm:pt-6">
+            <div className="relative h-14 w-14 shrink-0">
+              <div className="absolute inset-0 rounded-2xl bg-brand-magenta/10" />
+              <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border border-brand-plum/15 bg-brand-plum text-xl font-bold text-white shadow-sm">
+                {currentUser.avatar ? <img src={currentUser.avatar} alt="" className="h-full w-full object-cover" /> : currentUser.arabicName.charAt(0)}
+              </div>
+              <span className="absolute -bottom-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-brand-magenta text-white shadow-sm"><Sparkles className="h-3 w-3" /></span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold text-brand-plum">يسعدنا وجودك معنا</p>
+              <h2 className="mt-1 truncate text-base font-bold text-brand-darkText">أهلاً وسهلاً، {currentUser.arabicName}</h2>
+              <p className="mt-1 truncate text-xs text-brand-charcoal">{currentUser.jobTitleAr} · نتمنى لك يوماً موفقاً.</p>
+            </div>
+            <button type="button" onClick={dismissWelcomeGreeting} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-brand-charcoal transition hover:bg-brand-lightGray focus:outline-none focus:ring-2 focus:ring-brand-plum" aria-label="إغلاق رسالة الترحيب"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="h-1 w-full bg-brand-plum/10"><div className="welcome-progress h-full bg-brand-magenta" /></div>
+        </section>
+      </div>}
       {searchOpen && <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 px-3 pt-[12vh]" onMouseDown={event => { if (event.target === event.currentTarget) { setSearchOpen(false); setSearchQuery(''); } }}>
         <section role="dialog" aria-modal="true" aria-label="بحث شامل" className="w-full max-w-2xl overflow-hidden rounded-2xl border border-brand-border bg-white shadow-dialog">
           <div className="flex items-center gap-3 border-b border-brand-border px-4 py-3"><Search size={20} className="shrink-0 text-brand-plum" /><input autoFocus value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="ابحث في التكليفات والمشاريع والتعاميم وسجلات العمل" className="min-h-11 flex-1 border-0 bg-transparent text-sm outline-none" /><button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} aria-label="إغلاق البحث" className="rounded p-2 text-brand-charcoal hover:bg-brand-lightGray">×</button></div>
