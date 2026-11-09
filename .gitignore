@@ -6,5 +6,6 @@ dist/
 !.env.example
 *.log
 coverage/
+/backend/backups/
 .DS_Store
 Thumbs.db
