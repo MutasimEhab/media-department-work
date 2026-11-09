@@ -2,6 +2,9 @@ import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
 import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
@@ -17,7 +20,9 @@ import accountTypesRouter from './routes/account-types.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
-const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
+const frontendOrigin = process.env.FRONTEND_ORIGIN || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
+const frontendDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist');
+const frontendIndex = path.join(frontendDirectory, 'index.html');
 
 app.disable('x-powered-by');
 app.use(helmet());
@@ -45,11 +50,20 @@ app.get('/api/health', async (_request, response) => {
   }
 });
 
+app.use('/api', (_request, response) => {
+  response.status(404).json({ error: 'المسار غير موجود' });
+});
+
+if (existsSync(frontendIndex)) {
+  app.use(express.static(frontendDirectory));
+  app.get(/.*/, (_request, response) => response.sendFile(frontendIndex));
+}
+
 app.use((_request, response) => {
   response.status(404).json({ error: 'المسار غير موجود' });
 });
 
-const server = app.listen(port, () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Backend listening on http://localhost:${port}`);
 });
 
