@@ -19,8 +19,13 @@ import accountTypesRouter from './routes/account-types.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
-const frontendOrigin = process.env.FRONTEND_ORIGIN || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
-const frontendDirectory = path.resolve(process.cwd(), '../dist');
+const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
+const frontendDirectory = [
+  process.env.FRONTEND_DIST_DIR,
+  path.resolve(process.cwd(), 'dist'),
+  path.resolve(process.cwd(), '../dist'),
+].filter((directory): directory is string => Boolean(directory)).find((directory) => existsSync(path.join(directory, 'index.html')))
+  ?? path.resolve(process.cwd(), 'dist');
 const frontendIndex = path.join(frontendDirectory, 'index.html');
 
 app.disable('x-powered-by');
@@ -62,11 +67,16 @@ app.use((_request, response) => {
   response.status(404).json({ error: 'المسار غير موجود' });
 });
 
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`Backend listening on http://localhost:${port}`);
-});
+export default app;
+
+const server = process.env.VERCEL === '1'
+  ? undefined
+  : app.listen(port, '0.0.0.0', () => {
+    console.log(`Backend listening on http://localhost:${port}`);
+  });
 
 async function shutdown() {
+  if (!server) return;
   server.close(async () => {
     await db.end();
     process.exit(0);

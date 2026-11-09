@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "express",
+  "installCommand": "npm ci && npm --prefix backend ci",
+  "buildCommand": "npm run build && npm --prefix backend run build",
+  "regions": ["fra1"],
+  "functions": {
+    "index.ts": {
+      "includeFiles": "dist/**"
+    }
+  }
+}
