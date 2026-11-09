@@ -106,6 +106,15 @@ function mapBackendUser(user: BackendUser): User {
   };
 }
 
+function permissionKeyForUser(user: Pick<User, 'accountTypeCode' | 'role'>): string {
+  const accountTypeCode = user.accountTypeCode;
+  if (accountTypeCode === 'system_admin') return 'ADMIN';
+  if (accountTypeCode === 'department_manager') return 'MANAGER';
+  if (accountTypeCode === 'deputy_manager') return 'DEPUTY';
+  if (accountTypeCode === 'employee') return 'EMPLOYEE';
+  return accountTypeCode || user.role;
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language] = useState<Language>('ar');
   const [theme, setTheme] = useState<DisplayTheme>(() => {
@@ -329,7 +338,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         timestamp, isRead: false, actionUrl: '/app/work/new',
       }));
       const missingNames = missing.map(user => user.arabicName).join('، ');
-      const authorizedRecipients = users.filter(user => user.isActive && roleHasPermission(user.accountTypeCode || user.role, 'receive_missing_work_alerts', rolePermissions));
+      const authorizedRecipients = users.filter(user => user.isActive && roleHasPermission(permissionKeyForUser(user), 'receive_missing_work_alerts', rolePermissions));
       for (const recipient of authorizedRecipients) newNotifications.push({
         id: `NTF-MISSING-SUMMARY-${today}-${recipient.id}`, userId: recipient.id, type: 'WORK_LOG_MISSING',
         titleAr: 'متابعة سجلات العمل غير المسجلة', titleEn: 'Missing daily work logs follow-up',
@@ -669,7 +678,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
   const addUser = (user:User) => { if(users.some(u=>(Boolean(u.email)&&Boolean(user.email)&&u.email?.toLowerCase()===user.email?.toLowerCase())||Boolean(user.username&&u.username?.toLowerCase()===user.username.toLowerCase())))return false;setUsers(prev=>[...prev,user]);return true; };
-  const canAccess = (permission: AppPermission) => currentUser.role === 'ADMIN' || roleHasPermission(currentUser.accountTypeCode || currentUser.role, permission, rolePermissions);
+  const canAccess = (permission: AppPermission) => currentUser.role === 'ADMIN' || roleHasPermission(permissionKeyForUser(currentUser), permission, rolePermissions);
   const updateRolePermission = async (role: string, permission: AppPermission, enabled: boolean) => {
     if (currentUser.role !== 'ADMIN' || role === 'ADMIN' || role === 'system_admin') return false;
     const current = rolePermissions[role] || [...(DEFAULT_ROLE_PERMISSIONS[role as UserRole] || [])];
