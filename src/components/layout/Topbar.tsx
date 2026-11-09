@@ -242,7 +242,7 @@ export const Topbar: React.FC = () => {
               <span className="absolute -bottom-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-brand-magenta text-white shadow-sm"><Sparkles className="h-3 w-3" /></span>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold text-brand-plum">يسعدنا وجودك معنا</p>
+              <p className="text-[11px] font-semibold text-brand-plum">مرحباً بك في نظام إدارة أعمال دائرة الإعلام</p>
               <h2 className="mt-1 truncate text-base font-bold text-brand-darkText">أهلاً وسهلاً، {currentUser.arabicName}</h2>
               <p className="mt-1 truncate text-xs text-brand-charcoal">{currentUser.jobTitleAr} · نتمنى لك يوماً موفقاً.</p>
             </div>
