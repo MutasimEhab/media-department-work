@@ -35,21 +35,49 @@ export const SystemSettings: React.FC = () => {
     catch { return DEFAULT_SETTINGS; }
   });
   const [saved, setSaved] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [error, setError] = useState('');
   const [section, setSection] = useState<'organization'|'work'|'scoring'|'reminders'|'security'|'permissions'>('organization');
   const weightTotal = settings.weights.completion + settings.weights.timeliness + settings.weights.communication;
 
   useEffect(() => { setSaved(false); }, [settings]);
 
-  function saveSettings(event: React.FormEvent) {
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/system-settings', { credentials: 'include' })
+      .then(async response => {
+        const payload = await response.json() as { settings?: Partial<Settings> | null; message?: string };
+        if (!response.ok) throw new Error(payload.message || 'تعذر تحميل الإعدادات.');
+        if (!cancelled && payload.settings) {
+          const merged = { ...DEFAULT_SETTINGS, ...payload.settings, weights: { ...DEFAULT_SETTINGS.weights, ...payload.settings.weights } };
+          setSettings(merged);
+          try { localStorage.setItem('official_system_settings', JSON.stringify(merged)); } catch { /* the database remains authoritative */ }
+        }
+      })
+      .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'تعذر تحميل الإعدادات.'); })
+      .finally(() => { if (!cancelled) setLoadingSettings(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function saveSettings(event: React.FormEvent) {
     event.preventDefault();
     if (!settings.institution.trim() || !settings.department.trim()) { setError('أدخل اسم المؤسسة والدائرة.'); return; }
     if (weightTotal !== 100) { setError('يجب أن يساوي مجموع أوزان التقييم ١٠٠٪.'); return; }
     if (!settings.workdays.length) { setError('اختر يوم عمل واحدًا على الأقل.'); return; }
+    setSavingSettings(true);
     try {
-      localStorage.setItem('official_system_settings', JSON.stringify(settings));
+      const response = await fetch('/api/system-settings', {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings }),
+      });
+      const payload = await response.json() as { settings?: Settings; message?: string };
+      if (!response.ok || !payload.settings) throw new Error(payload.message || 'تعذر حفظ الإعدادات.');
+      setSettings(payload.settings);
+      try { localStorage.setItem('official_system_settings', JSON.stringify(payload.settings)); } catch { /* database save already succeeded */ }
       setError(''); setSaved(true);
-    } catch { setError('تعذر حفظ الإعدادات على هذا الجهاز.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم؛ لم تُحفظ الإعدادات.'); }
+    finally { setSavingSettings(false); }
   }
 
   const tabs = [
@@ -88,13 +116,14 @@ export const SystemSettings: React.FC = () => {
         <label className="text-sm font-semibold">المنطقة الزمنية<select className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" value={settings.timezone} onChange={e=>setSettings(s=>({...s,timezone:e.target.value}))}><option value="Asia/Gaza">فلسطين — توقيت غزة</option><option value="Asia/Jerusalem">فلسطين — التوقيت المحلي</option><option value="UTC">التوقيت العالمي UTC</option></select></label>
         <div className="rounded-lg border border-brand-border bg-brand-lightGray/40 p-3 text-sm"><b>لغة النظام</b><p className="mt-1">العربية فقط · اتجاه العرض من اليمين إلى اليسار</p></div>
       </div></Card>}
-      {section==='work'&&<Card title="أيام وساعات الدوام الرسمي"><fieldset><legend className="mb-2 text-sm font-semibold">أيام العمل</legend><div className="flex flex-wrap gap-3">{WORKDAYS.map(day=><label key={day} className="flex items-center gap-2 rounded-lg border border-brand-border px-3 py-2"><input type="checkbox" checked={settings.workdays.includes(day)} onChange={e=>setSettings(s=>({...s,workdays:e.target.checked?[...s.workdays,day]:s.workdays.filter(value=>value!==day)}))}/>{day}</label>)}</div></fieldset><div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">بداية الدوام<input type="time" dir="ltr" className="mt-1 block rounded-input border border-brand-border p-3 font-normal" value={settings.startTime} onChange={e=>setSettings(s=>({...s,startTime:e.target.value}))}/></label><label className="text-sm font-semibold">نهاية الدوام<input type="time" dir="ltr" className="mt-1 block rounded-input border border-brand-border p-3 font-normal" value={settings.endTime} onChange={e=>setSettings(s=>({...s,endTime:e.target.value}))}/></label></div><p className="mt-3 text-xs text-brand-charcoal">تغيير هذه القيم هنا يحفظ إعدادات العرض المحلي؛ يلزم ربطها بخادم النظام لتطبيقها مركزيًا.</p></Card>}
+      {section==='work'&&<Card title="أيام وساعات الدوام الرسمي"><fieldset><legend className="mb-2 text-sm font-semibold">أيام العمل</legend><div className="flex flex-wrap gap-3">{WORKDAYS.map(day=><label key={day} className="flex items-center gap-2 rounded-lg border border-brand-border px-3 py-2"><input type="checkbox" checked={settings.workdays.includes(day)} onChange={e=>setSettings(s=>({...s,workdays:e.target.checked?[...s.workdays,day]:s.workdays.filter(value=>value!==day)}))}/>{day}</label>)}</div></fieldset><div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">بداية الدوام<input type="time" dir="ltr" className="mt-1 block rounded-input border border-brand-border p-3 font-normal" value={settings.startTime} onChange={e=>setSettings(s=>({...s,startTime:e.target.value}))}/></label><label className="text-sm font-semibold">نهاية الدوام<input type="time" dir="ltr" className="mt-1 block rounded-input border border-brand-border p-3 font-normal" value={settings.endTime} onChange={e=>setSettings(s=>({...s,endTime:e.target.value}))}/></label></div><p className="mt-3 text-xs text-brand-charcoal">تُحفظ الإعدادات مركزياً في قاعدة البيانات وتُحمّل عند تسجيل الدخول.</p></Card>}
       {section==='scoring'&&<Card title="أوزان مؤشرات الأداء"><p className="mb-4 text-sm">يجب أن يساوي مجموع الأوزان ١٠٠٪.</p><div className="grid gap-4 sm:grid-cols-3">{([['completion','إنجاز الأعمال'],['timeliness','الالتزام بالمواعيد'],['communication','المخرجات الإعلامية']] as const).map(([key,label])=><label key={key} className="text-sm font-semibold">{label} (%)<input type="number" min="0" max="100" className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" value={settings.weights[key]} onChange={e=>setSettings(s=>({...s,weights:{...s.weights,[key]:Number(e.target.value)}}))}/></label>)}</div><p className={`mt-3 font-bold ${weightTotal===100?'text-green-700':'text-red-700'}`}>المجموع: {weightTotal}٪</p></Card>}
       {section==='reminders'&&<Card title="سياسة التنبيهات"><div className="space-y-5"><section className="rounded-lg border border-brand-border p-4"><label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={settings.missingWorkAlertsEnabled} onChange={e=>setSettings(s=>({...s,missingWorkAlertsEnabled:e.target.checked}))}/>تنبيه الموظف عند عدم تسجيل العمل اليومي</label><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-sm">موعد فحص السجلات وإرسال التنبيه<input type="time" dir="ltr" className="mt-1 block rounded-input border border-brand-border p-3" value={settings.missingWorkAlertTime} onChange={e=>setSettings(s=>({...s,missingWorkAlertTime:e.target.value}))}/></label><p className="self-end text-sm">يُفحص الموظفون النشطون في أيام الدوام المحددة. يُرسل تذكير للموظف وتنبيه متابعة للمستخدمين المخولين.</p></div><p className="mt-3 text-xs text-brand-charcoal">حدّد المستلمين من مصفوفة الصلاحيات عبر صلاحية «استلام تنبيهات عدم تسجيل العمل اليومي».</p></section><section><p className="mb-3 text-sm font-semibold">مواعيد التذكير بالتكليف قبل الاستحقاق</p><div className="flex flex-wrap gap-3">{[24,2].map(hours=><label key={hours} className="flex items-center gap-2 rounded-lg border border-brand-border px-3 py-2"><input type="checkbox" checked={settings.taskReminderHours.includes(hours)} onChange={e=>setSettings(s=>({...s,taskReminderHours:e.target.checked?[...s.taskReminderHours,hours]:s.taskReminderHours.filter(value=>value!==hours)}))}/>{hours===24?'قبل ٢٤ ساعة':'قبل ساعتين'}</label>)}</div><p className="mt-2 text-sm">تذكير يومي بعد تجاوز الموعد · إقرار التعميم بعد ٢٤ ساعة ثم كل ٤٨ ساعة، بحد أقصى ٣ تذكيرات.</p></section><section className="rounded-lg border border-brand-border bg-brand-lightGray/30 p-4"><label className="flex items-center gap-2 text-sm text-brand-charcoal"><input type="checkbox" checked={settings.smsNotificationsEnabled} disabled/>تفعيل إرسال التنبيهات عبر الرسائل النصية (SMS)</label><p className="mt-2 text-xs text-brand-charcoal">القناة جاهزة للإعداد لاحقًا، لكنها غير مفعّلة حتى ربط مزوّد رسائل ومفاتيح الإرسال بالخادم.</p><p className="mt-1 text-xs text-brand-charcoal">التنبيهات الحالية تظهر داخل الموقع فقط، ولا يتم إرسال رسائل فعلية.</p></section></div></Card>}
-      {section==='security'&&<Card title="ضوابط الأمان والجلسات"><label className="block max-w-sm text-sm font-semibold">مدة الخمول قبل انتهاء الجلسة (دقيقة)<input type="number" min="5" max="240" className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" value={settings.sessionMinutes} onChange={e=>setSettings(s=>({...s,sessionMinutes:Number(e.target.value)}))}/></label><div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm"><b>حالة التطبيق</b><p className="mt-1">إعدادات هذا النموذج محفوظة على هذا الجهاز فقط. إدارة الجلسات وكلمات المرور وتطبيق السياسات مركزيًا تتطلب خادمًا خلفيًا.</p></div></Card>}
+      {section==='security'&&<Card title="ضوابط الأمان والجلسات"><label className="block max-w-sm text-sm font-semibold">مدة الخمول قبل انتهاء الجلسة (دقيقة)<input type="number" min="5" max="240" className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" value={settings.sessionMinutes} onChange={e=>setSettings(s=>({...s,sessionMinutes:Number(e.target.value)}))}/></label><div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm"><b>حالة التطبيق</b><p className="mt-1">تُحفظ قيمة مدة الجلسة مركزياً. تطبيقها على جلسات الدخول نفسها وإرسال SMS يحتاجان إعداداً إضافياً في الخادم ومزوّد الرسائل.</p></div></Card>}
       {error&&<p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-      {saved&&<p role="status" className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800">تم حفظ الإعدادات على هذا الجهاز.</p>}
-      <div className="flex flex-wrap gap-2"><Button type="submit">حفظ الإعدادات</Button><Button type="button" variant="outline" onClick={()=>setSettings(DEFAULT_SETTINGS)}>استعادة القيم الافتراضية</Button></div>
+      {saved&&<p role="status" className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800">تم حفظ الإعدادات في قاعدة البيانات.</p>}
+      {loadingSettings&&<p role="status" className="text-sm">جارٍ تحميل الإعدادات المحفوظة…</p>}
+      <div className="flex flex-wrap gap-2"><Button type="submit" disabled={savingSettings||loadingSettings}>{savingSettings?'جارٍ الحفظ…':'حفظ الإعدادات'}</Button><Button type="button" variant="outline" disabled={savingSettings||loadingSettings} onClick={()=>setSettings(DEFAULT_SETTINGS)}>استعادة القيم الافتراضية</Button></div>
     </form>}
   </main>;
 };

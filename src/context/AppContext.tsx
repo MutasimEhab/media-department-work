@@ -157,6 +157,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => { cancelled = true; };
   }, [isAuthenticated, currentUser.id]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    fetch('/api/system-settings', { credentials: 'include' })
+      .then(async response => {
+        if (!response.ok) return null;
+        return await response.json() as { settings?: Record<string, unknown> | null };
+      })
+      .then(payload => {
+        if (cancelled || !payload?.settings) return;
+        try { localStorage.setItem('official_system_settings', JSON.stringify(payload.settings)); } catch { /* settings stay available from server on next session */ }
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [isAuthenticated, currentUser.id]);
+
   const [users, setUsers] = useState<User[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('official_users') || '[]') as User[];
