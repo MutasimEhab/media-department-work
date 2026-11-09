@@ -4,7 +4,6 @@ import express from 'express';
 import helmet from 'helmet';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
 import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
@@ -21,7 +20,7 @@ import accountTypesRouter from './routes/account-types.js';
 const app = express();
 const port = Number(process.env.PORT || 4000);
 const frontendOrigin = process.env.FRONTEND_ORIGIN || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
-const frontendDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist');
+const frontendDirectory = path.resolve(process.cwd(), '../dist');
 const frontendIndex = path.join(frontendDirectory, 'index.html');
 
 app.disable('x-powered-by');
