@@ -11,7 +11,7 @@ import { formatArabicWorkDate } from '../../utils/dateFormatting';
 import { downloadWorkReportPdf } from '../../utils/workReportPdf';
 
 export const WorkHistory: React.FC = () => {
-  const { language, currentUser, workLogs, tasks, projects, updateWorkLog, deleteWorkLog, notify } = useApp();
+  const { language, currentUser, workLogs, tasks, projects, updateWorkLog, deleteWorkLog, notify, institutionLogo } = useApp();
   const ar = language === 'ar';
   const tx = (arabic: string, english: string) => ar ? arabic : english;
   const [query, setQuery] = useState('');
@@ -48,7 +48,7 @@ export const WorkHistory: React.FC = () => {
       await downloadWorkReportPdf(rows, [{
         id: currentUser.id, arabicName: currentUser.arabicName,
         employeeNumber: currentUser.employeeNumber, jobTitleAr: currentUser.jobTitleAr,
-      }], fromDate, toDate, currentUser.id);
+      }], fromDate, toDate, currentUser.id, institutionLogo);
       notify('تم تجهيز كشف الأعمال وبدء تنزيل ملف PDF.', 'success');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'تعذر إنشاء ملف PDF.';

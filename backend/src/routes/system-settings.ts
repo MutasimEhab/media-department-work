@@ -38,7 +38,11 @@ router.put('/', async (request: AuthenticatedRequest, response) => {
     && typeof value.missingWorkAlertsEnabled === 'boolean' && timePattern.test(value.missingWorkAlertTime)
     && value.smsNotificationsEnabled === false
     && Number.isInteger(value.sessionMinutes) && value.sessionMinutes >= 5 && value.sessionMinutes <= 240
-    && value.language === 'ar';
+    && value.language === 'ar'
+    && (value.organizationLogo === undefined || value.organizationLogo === null
+      || (typeof value.organizationLogo === 'string'
+        && value.organizationLogo.length <= 500_000
+        && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value.organizationLogo)));
   if (!valid) {
     response.status(400).json({ message: 'تحقق من بيانات الإعدادات وقيم الدوام والتقييم والتنبيهات.' });
     return;

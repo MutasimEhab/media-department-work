@@ -11,7 +11,7 @@ interface DatabaseUsersResponse { users?: User[]; message?: string }
 interface WorkLogsResponse { workLogs?: WorkLog[]; message?: string }
 
 export const ManagementWorkLogs: React.FC = () => {
-  const { language, frozenDate } = useApp();
+  const { language, today, institutionLogo } = useApp();
   const tx = (arabic: string, english: string) => language === 'ar' ? arabic : english;
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -55,7 +55,7 @@ export const ManagementWorkLogs: React.FC = () => {
     && (!month || log.date.startsWith(month))
     && (!date || log.date === date)
     && (!mode || log.location === mode)), [workLogs, query, employee, month, date, mode]);
-  const todayLogs = workLogs.filter(log => log.date === frozenDate);
+  const todayLogs = workLogs.filter(log => log.date === today);
   const todayEmployees = new Set(todayLogs.map(log => log.userId));
   const nonSubmitters = users.filter(user => user.isActive && !todayEmployees.has(user.id));
 
@@ -72,7 +72,7 @@ export const ManagementWorkLogs: React.FC = () => {
       await downloadWorkReportPdf(rows, users.map(user => ({
         id: user.id, arabicName: user.arabicName,
         employeeNumber: user.employeeNumber, jobTitleAr: user.jobTitleAr,
-      })), rangeFrom, rangeTo, employee);
+      })), rangeFrom, rangeTo, employee, institutionLogo);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'تعذر إنشاء ملف PDF.');
     } finally {

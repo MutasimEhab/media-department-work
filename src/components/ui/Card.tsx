@@ -37,7 +37,7 @@ export const Card: React.FC<CardProps> = ({
     >
       {provisionalNotice && (
         <div className="bg-amber-100/70 border-b border-amber-200 px-4 py-1.5 text-[11px] font-semibold text-amber-900 flex items-center justify-between">
-          <span>واجهة تجريبية · بانتظار الاعتماد الرسمي</span>
+          <span>محتوى قيد المراجعة</span>
         </div>
       )}
 

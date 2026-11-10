@@ -197,7 +197,7 @@ export const Sidebar: React.FC = () => {
 
         {/* Footer info */}
         <div className="p-3 border-t border-brand-border bg-white text-[10px] text-brand-charcoal/60 text-center font-mono" dir="ltr">
-          {language === 'ar' ? 'مؤسسة السمع والبصر · نسخة تجريبية' : 'HSF · Prototype'}
+          {language === 'ar' ? 'مؤسسة السمع والبصر للتنمية والتأهيل المجتمعي' : 'Hearing and Sight Foundation'}
         </div>
       </aside>
     </>

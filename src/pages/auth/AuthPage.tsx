@@ -4,7 +4,6 @@ import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
 import { TextField } from '../../components/ui/TextField';
-import organizationLogo from '../../assets/brand/organization-logo.png';
 
 export const AuthPage: React.FC = () => {
   const { login, isAuthenticated, isAuthLoading, currentUser } = useApp();
@@ -61,7 +60,6 @@ export const AuthPage: React.FC = () => {
       <div className="max-w-6xl mx-auto grid lg:grid-cols-2 items-stretch">
         <section className="space-y-6">
           <p className="auth-system-title">نظام إدارة أعمال دائرة الإعلام</p>
-          <img src={organizationLogo} alt="شعار المؤسسة" className="w-28 h-28 object-contain" />
           <h1 className="text-3xl sm:text-4xl font-bold leading-relaxed">أعمال قسم الإعلامية</h1>
           <p className="leading-8">نظام تسجيل ومتابعة أعمال موظفي قسم الإعلامية.</p>
           <div className="space-y-2 text-sm">

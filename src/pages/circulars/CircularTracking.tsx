@@ -47,7 +47,6 @@ export const CircularTracking: React.FC = () => {
       <div className="flex flex-wrap gap-2">
         <input className="border rounded p-2" placeholder={tx('بحث باسم المستلم', 'Search recipient')} value={query} onChange={event => setQuery(event.target.value)} />
         {([['ALL', tx('الكل', 'All')], ['ACK', tx('تم الإقرار', 'Acknowledged')], ['PENDING', tx('معلق', 'Pending')]] as const).map(([value, label]) => <Button key={value} size="sm" variant={filter === value ? 'secondary' : 'outline'} onClick={() => setFilter(value)}>{label}</Button>)}
-        <Button variant="outline" onClick={() => alert(tx('معاينة CSV تجريبية فقط.', 'CSV preview only; no file created.'))}>معاينة تصدير البيانات (CSV)</Button>
       </div>
       {message && <p role="status" className="mt-3 text-sm">{message}</p>}
       <div className="grid md:grid-cols-2 gap-3 mt-4">

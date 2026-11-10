@@ -1,5 +1,3 @@
-import organizationLogo from '../assets/brand/organization-logo.png';
-
 export type WorkReportRow = {
   id: string;
   userId: string;
@@ -13,16 +11,14 @@ export type WorkReportRow = {
 
 export type ReportEmployee = { id: string; arabicName: string; employeeNumber?: string; jobTitleAr?: string };
 
-async function dataUrl(url: string): Promise<string> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('تعذر تحميل شعار المؤسسة للتقرير.');
-  const blob = await response.blob();
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('تعذر قراءة ملف الترويسة.'));
-    reader.readAsDataURL(blob);
-  });
+async function pngDataUrl(source: string): Promise<string> {
+  const image = new Image();
+  image.src = source;
+  await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('تعذر قراءة شعار المؤسسة.')); });
+  const canvas = document.createElement('canvas');
+  canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+  canvas.getContext('2d')!.drawImage(image, 0, 0);
+  return canvas.toDataURL('image/png');
 }
 
 async function fontBase64(url: string): Promise<string> {
@@ -66,14 +62,15 @@ export async function downloadWorkReportPdf(
   from: string,
   to: string,
   selectedEmployeeId = '',
+  organizationLogo = '',
 ) {
-  const [{ jsPDF }, { default: autoTable }, logo, font, wave] = await Promise.all([
+  const [{ jsPDF }, { default: autoTable }, font, wave] = await Promise.all([
     import('jspdf'),
     import('jspdf-autotable'),
-    dataUrl(organizationLogo),
     fontBase64((await import('../assets/brand/fonts/Janna-LT-Regular.ttf?url')).default),
     footerWave(),
   ]);
+  const logo = organizationLogo ? await pngDataUrl(organizationLogo) : '';
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   doc.addFileToVFS('Janna-Regular.ttf', font);
   doc.addFont('Janna-Regular.ttf', 'Janna', 'normal');
@@ -97,7 +94,7 @@ export async function downloadWorkReportPdf(
     const width = doc.internal.pageSize.getWidth();
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, width, 74, 'F');
-    doc.addImage(logo, 'PNG', margin + 1, 9, 27, 27);
+    if (logo) doc.addImage(logo, 'PNG', margin + 1, 9, 27, 27);
     doc.setTextColor(68, 68, 68);
     doc.setFontSize(12);
     doc.text('مؤسسة السمع والبصر', margin + 32, 14);

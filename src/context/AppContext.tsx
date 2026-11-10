@@ -2,7 +2,6 @@ import React, { createContext, useCallback, useContext, useState, useEffect } fr
 import { User, Task, Project, Circular, WorkLog, NotificationItem, UserRole, WorkDateException } from '../types';
 import {
   MOCK_USERS,
-  FROZEN_DEMO_DATE,
 } from '../data/mockData';
 import { translations, Language } from '../i18n/translations';
 import { AppPermission, DEFAULT_ROLE_PERMISSIONS, roleHasPermission, RolePermissionOverrides } from '../auth/permissions';
@@ -37,7 +36,9 @@ interface AppContextType {
   removePendingWork: (id: string) => void;
   notifications: NotificationItem[];
   unreadNotificationCount: number;
-  frozenDate: string;
+  today: string;
+  institutionLogo: string;
+  setInstitutionLogo: (logo: string) => void;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
@@ -125,6 +126,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [welcomeGreetingOpen, setWelcomeGreetingOpen] = useState(false);
+  const getGazaDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Gaza', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const [today, setToday] = useState(getGazaDate);
+  const [institutionLogo, setInstitutionLogoState] = useState(() => {
+    try { return String((JSON.parse(localStorage.getItem('official_system_settings') || '{}') as { organizationLogo?: string }).organizationLogo || ''); }
+    catch { return ''; }
+  });
+  const setInstitutionLogo = useCallback((logo: string) => setInstitutionLogoState(logo), []);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const dismissToast = useCallback((id: string) => setToasts(previous => previous.filter(item => item.id !== id)), []);
   const notify = useCallback((message: string, type: ToastType = 'success') => {
@@ -133,6 +141,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.setTimeout(() => setToasts(previous => previous.filter(item => item.id !== id)), 5000);
   }, []);
   const dismissWelcomeGreeting = useCallback(() => setWelcomeGreetingOpen(false), []);
+  useEffect(() => {
+    const refreshDate = () => setToday(getGazaDate());
+    const timer = window.setInterval(refreshDate, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   // Keep a harmless fallback for pages such as sign-in; AppShell blocks every internal route until authentication.
   const [currentUser, setCurrentUser] = useState<User>(() => {
     try {
@@ -188,6 +201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .then(payload => {
         if (cancelled || !payload?.settings) return;
         try { localStorage.setItem('official_system_settings', JSON.stringify(payload.settings)); } catch { /* settings stay available from server on next session */ }
+        setInstitutionLogo(String(payload.settings.organizationLogo || ''));
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
@@ -770,7 +784,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         removePendingWork,
         notifications,
         unreadNotificationCount,
-        frozenDate: FROZEN_DEMO_DATE,
+        today,
+        institutionLogo,
+        setInstitutionLogo,
         isSidebarOpen,
         setIsSidebarOpen,
         toggleSidebar,

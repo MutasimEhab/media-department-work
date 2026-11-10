@@ -8,7 +8,7 @@ import { Select } from '../../components/ui/Select';
 import { useApp } from '../../context/AppContext';
 
 export const QuickWorkEntry: React.FC = () => {
-  const { language, currentUser, users, tasks, projects, workLogs, addWorkLog, frozenDate, exceptions } = useApp();
+  const { language, currentUser, users, tasks, projects, workLogs, addWorkLog, today, exceptions } = useApp();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const adminEntry = pathname === '/app/admin/add-work';
@@ -18,14 +18,17 @@ export const QuickWorkEntry: React.FC = () => {
   const ar=language==='ar'; const txt=(a:string,e:string)=>ar?a:e;
   const [area,setArea]=useState(''); const [location,setLocation]=useState<'OFFICE'|'FIELD'>('OFFICE');
   const [description,setDescription]=useState(''); const [drive,setDrive]=useState(''); const [taskId,setTaskId]=useState(''); const [projectId,setProjectId]=useState('');
-  const [selectedDate,setSelectedDate]=useState(frozenDate);
+  const [selectedDate,setSelectedDate]=useState(today);
+  const [clockNow,setClockNow]=useState(() => new Date());
+  useEffect(() => { const timer=window.setInterval(()=>setClockNow(new Date()),30_000); return ()=>window.clearInterval(timer); },[]);
+  useEffect(() => { if (selectedDate === '') setSelectedDate(today); }, [selectedDate,today]);
   const [error,setError]=useState(''); const [saving,setSaving]=useState(false); const [saved,setSaved]=useState(false);
   const [savedOffline,setSavedOffline]=useState(false);
   const savedOnce=useRef(false);
   const dirty=Boolean(area||description||drive||taskId||projectId);
   useEffect(()=>{if(!dirty||saved)return; const handler=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';}; window.addEventListener('beforeunload',handler);return()=>window.removeEventListener('beforeunload',handler);},[dirty,saved]);
   const ownLogs=workLogs.filter(x=>x.userId===targetUser.id);
-  const allowedDates=[frozenDate,...exceptions.filter(x=>x.userId===targetUser.id&&!x.revokedAt&&(!x.expiresAt||new Date(x.expiresAt).getTime()>Date.now())).flatMap(x=>x.dates)];
+  const allowedDates=[today,...exceptions.filter(x=>x.userId===targetUser.id&&!x.revokedAt&&(!x.expiresAt||new Date(x.expiresAt).getTime()>Date.now())).flatMap(x=>x.dates)];
   const duplicate=ownLogs.some(x=>x.date===selectedDate && x.activityAr.trim().toLowerCase()===description.trim().toLowerCase() && description.trim().length>0);
   const driveValid=!drive||/^https:\/\/drive\.google\.com\/(file\/d\/[^/]+\/view|drive\/folders\/[^/?]+)(\?.*)?$/.test(drive.trim());
   const suggestions=useMemo(()=>Array.from(new Set(ownLogs.flatMap(x=>[x.activityAr,x.activityEn]).filter(Boolean))).slice(0,4),[ownLogs]);
@@ -40,7 +43,7 @@ export const QuickWorkEntry: React.FC = () => {
   async function submit(e:React.FormEvent){e.preventDefault();if(savedOnce.current||saving)return;setError('');if(!description.trim()||!area.trim()){setError('required');return;}if(!driveValid){setError('url');return;}if(duplicate&&!window.confirm(txt('يوجد سجل مشابه لك اليوم. هل تريد حفظ سجل آخر؟','A similar entry exists for today. Save another record?')))return;
     if(!navigator.onLine){setError('offline');return;}savedOnce.current=true;setSaving(true);
     const project=projects.find(p=>p.id===projectId);
-    const entry={userId:targetUser.id,userNameAr:targetUser.arabicName,userNameEn:targetUser.englishName,date:selectedDate,time:'09:15 AM',activityAr:description.trim(),activityEn:description.trim(),area:area.trim(),location,relatedTaskId:taskId||undefined,projectId:project?.id,projectTitleAr:project?.titleAr,projectTitleEn:project?.titleEn,outputLink:drive.trim()||undefined,isException:selectedDate!==frozenDate};
+    const entry={userId:targetUser.id,userNameAr:targetUser.arabicName,userNameEn:targetUser.englishName,date:selectedDate,time:new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Gaza',hour:'2-digit',minute:'2-digit'}).format(clockNow),activityAr:description.trim(),activityEn:description.trim(),area:area.trim(),location,relatedTaskId:taskId||undefined,projectId:project?.id,projectTitleAr:project?.titleAr,projectTitleEn:project?.titleEn,outputLink:drive.trim()||undefined,isException:selectedDate!==today};
     const result=await addWorkLog(entry);setSaving(false);if(!result.ok){setError(result.message||'save');savedOnce.current=false;return;}setSaved(true);
   }
   const clearFields=()=>{if(dirty&&!window.confirm(txt('مسح البيانات المدخلة؟','Clear the entered fields?')))return;setArea('');setLocation('OFFICE');setDescription('');setDrive('');setTaskId('');setProjectId('');setError('');};
@@ -54,10 +57,10 @@ export const QuickWorkEntry: React.FC = () => {
       <div className="space-y-5">
         <label className="block text-sm"><span className="mb-1.5 block font-bold">{txt('اسم الموظف','Employee name')}</span>{adminEntry?<span className="flex min-h-12 items-center gap-2 rounded-lg border border-brand-border bg-white px-3"><UserRound size={17} className="text-brand-plum"/><select aria-label="اختيار الموظف" className="min-h-11 flex-1 bg-transparent" value={targetUserId} onChange={event=>setTargetUserId(event.target.value)}>{employeeOptions.map(user=><option key={user.id} value={user.id}>{user.arabicName}</option>)}</select></span>:<span className="flex min-h-12 items-center gap-2 rounded-lg border border-brand-magenta/25 bg-brand-magenta/5 px-3 font-subheading text-brand-plum"><UserRound size={17}/>{ar?currentUser.arabicName:currentUser.englishName}<span className="ms-auto text-xs text-brand-charcoal/60">{txt('حسابك الحالي','Current account')}</span></span>}</label>
 
-        <section className="rounded-xl border border-brand-border p-3 sm:p-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-bold">{txt('تاريخ العمل','Work date')}</h2><time className="text-xs text-brand-charcoal/70" dateTime={selectedDate} dir="ltr">{selectedDate}</time></div><label className="mb-3 block max-w-sm text-sm">{txt('اختر تاريخ العمل','Choose work date')}<input aria-label={txt('اختر تاريخ العمل','Choose work date')} type="date" dir="ltr" max={frozenDate} min={allowedDates.length>1?allowedDates.slice().sort()[0]:frozenDate} value={selectedDate} onChange={event=>setSelectedDate(event.target.value)} className="mt-1 min-h-11 w-full rounded-input border border-brand-border bg-white px-3" /></label><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{dateParts.map(part=><label key={part.label} className="block text-xs font-semibold text-brand-charcoal">{part.label}<input readOnly value={part.value} className="mt-1 min-h-11 w-full rounded-input border border-brand-border bg-brand-lightGray/30 px-3 text-sm font-normal text-brand-darkText"/></label>)}</div>{selectedDate!==frozenDate&&<div className="mt-3 flex flex-wrap items-center gap-3"><span className="text-xs text-brand-charcoal/70">{allowedDates.includes(selectedDate)?txt('هذا التاريخ لديه استثناء معتمد.','This date has an approved exception.'):txt('هذا التاريخ السابق يحتاج استثناءً معتمداً قبل الحفظ.','This past date needs an approved exception before saving.')}</span><Link to="/app/my-exceptions" className="text-xs text-brand-plum underline">{txt('عرض استثناءاتي','View my exceptions')}</Link></div>}</section>
+        <section className="rounded-xl border border-brand-border p-3 sm:p-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-bold">{txt('تاريخ العمل','Work date')}</h2><time className="text-xs text-brand-charcoal/70" dateTime={selectedDate} dir="ltr">{selectedDate}</time></div><label className="mb-3 block max-w-sm text-sm">{txt('اختر تاريخ العمل','Choose work date')}<input aria-label={txt('اختر تاريخ العمل','Choose work date')} type="date" dir="ltr" max={today} min={allowedDates.length>1?allowedDates.slice().sort()[0]:today} value={selectedDate} onChange={event=>setSelectedDate(event.target.value)} className="mt-1 min-h-11 w-full rounded-input border border-brand-border bg-white px-3" /></label><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{dateParts.map(part=><label key={part.label} className="block text-xs font-semibold text-brand-charcoal">{part.label}<input readOnly value={part.value} className="mt-1 min-h-11 w-full rounded-input border border-brand-border bg-brand-lightGray/30 px-3 text-sm font-normal text-brand-darkText"/></label>)}</div>{selectedDate!==today&&<div className="mt-3 flex flex-wrap items-center gap-3"><span className="text-xs text-brand-charcoal/70">{allowedDates.includes(selectedDate)?txt('هذا التاريخ لديه استثناء معتمد.','This date has an approved exception.'):txt('هذا التاريخ السابق يحتاج استثناءً معتمداً قبل الحفظ.','This past date needs an approved exception before saving.')}</span><Link to="/app/my-exceptions" className="text-xs text-brand-plum underline">{txt('عرض استثناءاتي','View my exceptions')}</Link></div>}</section>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5"><span className="block text-sm font-bold">{txt('وقت الإدخال','Entry time')}</span><span className="flex min-h-12 items-center gap-2 rounded-lg border border-brand-border bg-brand-lightGray/30 px-3 text-sm"><Clock3 size={17} className="text-brand-plum"/><time dir="ltr">09:15 AM</time><span className="ms-auto text-[11px] text-brand-charcoal/60">{txt('وقت تجريبي ثابت','Fixed demo time')}</span></span></div>
+          <div className="space-y-1.5"><span className="block text-sm font-bold">{txt('وقت الإدخال','Entry time')}</span><span className="flex min-h-12 items-center gap-2 rounded-lg border border-brand-border bg-brand-lightGray/30 px-3 text-sm"><Clock3 size={17} className="text-brand-plum"/><time dir="ltr">{new Intl.DateTimeFormat(ar?'ar-PS':'en-US',{timeZone:'Asia/Gaza',hour:'2-digit',minute:'2-digit',hour12:true}).format(clockNow)}</time></span></div>
           <Select label={txt('طبيعة العمل','Nature of work')} value={location} onChange={e=>setLocation(e.target.value as 'OFFICE'|'FIELD')} options={[{value:'OFFICE',label:txt('مكتبي','Office')},{value:'FIELD',label:txt('ميداني','Field')}]}/>
         </div>
 

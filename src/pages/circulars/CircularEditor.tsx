@@ -50,7 +50,7 @@ export const CircularEditor: React.FC = () => {
       issuerId: currentUser.id,
       issuerNameAr: currentUser.arabicName,
       issuerNameEn: currentUser.englishName,
-      issuedAt: '2026-10-31 09:15 AM',
+      issuedAt: new Date().toISOString(),
       targetAudience: audience,
       isDraft: !publish,
       recipients: targets,
@@ -80,6 +80,6 @@ export const CircularEditor: React.FC = () => {
     <Card title={tx('قنوات إضافية (محاكاة)','Optional channels (simulated)')}><label className="me-4"><input type="checkbox" checked={email} onChange={event=>setEmail(event.target.checked)}/> {tx('البريد الإلكتروني','Email')}</label><label><input type="checkbox" checked={sms} onChange={event=>setSms(event.target.checked)}/> {tx('الرسائل النصية','SMS')}</label><p className="text-sm">{tx('الإشعار الداخلي دائم؛ البريد والرسائل لا تُرسل فعلياً.','Internal notification is always on; email and SMS are never actually sent.')}</p></Card>
     {error&&<p role="alert" className="text-sm text-red-700">{error==='content'?tx('أكمل عنوان التعميم ومحتواه بالعربية.','Enter the circular title and content in Arabic.'):tx('لا يمكن النشر من دون مستلمين.','Choose at least one recipient before publishing.')}</p>}
     <div className="flex gap-2"><Button variant="outline" onClick={()=>save(false)}>{tx('حفظ مسودة','Save draft')}</Button><Button onClick={()=>setConfirm(true)}>{tx('نشر','Publish')}</Button></div>
-    {confirm&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card title={tx('تأكيد النشر','Confirm publication')} className="w-full max-w-md"><p>{tx(`سيتم إنشاء إشعارات داخلية لـ ${recipients.length} مستلم.`,`${recipients.length} internal demo notifications will be created.`)}</p><p>{tx('لن يتم إرسال بريد أو SMS فعلياً.','No actual email or SMS will be sent.')}</p><div className="mt-4 flex gap-2"><Button onClick={()=>save(true)}>{tx('تأكيد النشر','Confirm and publish')}</Button><Button variant="outline" onClick={()=>setConfirm(false)}>{tx('رجوع','Back')}</Button></div></Card></div>}
+    {confirm&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card title={tx('تأكيد النشر','Confirm publication')} className="w-full max-w-md"><p>{tx(`سيتم إنشاء إشعارات داخلية لـ ${recipients.length} مستلم.`,`${recipients.length} internal notifications will be created.`)}</p><p>{tx('لن يتم إرسال بريد أو SMS فعلياً.','Email and SMS delivery are not enabled.')}</p><div className="mt-4 flex gap-2"><Button onClick={()=>save(true)}>{tx('تأكيد النشر','Confirm and publish')}</Button><Button variant="outline" onClick={()=>setConfirm(false)}>{tx('رجوع','Back')}</Button></div></Card></div>}
   </main>;
 };

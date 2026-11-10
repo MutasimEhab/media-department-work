@@ -3,7 +3,6 @@ import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Wifi, WifiOff, Searc
 import { useApp } from '../../context/AppContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
-import organizationLogo from '../../assets/brand/organization-logo.png';
 
 export const Topbar: React.FC = () => {
   const {
@@ -24,6 +23,7 @@ export const Topbar: React.FC = () => {
     theme,
     setTheme,
     t,
+    institutionLogo,
   } = useApp();
 
   const [openMenu, setOpenMenu] = useState<'notifications' | 'user' | null>(null);
@@ -58,7 +58,7 @@ export const Topbar: React.FC = () => {
   return (
     <header className="sticky top-0 z-30 flex min-h-[64px] w-full items-center justify-between border-b border-brand-border bg-white px-3 shadow-sm sm:px-5 lg:px-7">
       <div className="flex min-w-0 items-center gap-3">
-        <img src={organizationLogo} alt={t.app.subTitle} className="h-10 w-10 shrink-0 object-contain" />
+        {institutionLogo && <img src={institutionLogo} alt={t.app.subTitle} className="h-10 w-10 shrink-0 object-contain" />}
         <div className="min-w-0">
           <h1 className="truncate text-xs font-bold text-brand-darkText sm:text-sm">{t.app.title}</h1>
           <p className="truncate text-[10px] text-brand-charcoal/75 sm:text-[11px]">{language === 'ar' ? currentUser.departmentAr : currentUser.departmentEn} · {t.app.subTitle}</p>

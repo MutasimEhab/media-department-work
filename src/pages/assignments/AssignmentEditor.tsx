@@ -27,7 +27,7 @@ const tomorrowInGaza = (date: string) => {
 };
 
 export const AssignmentEditor: React.FC = () => {
-  const { language, currentUser, users, tasks, saveTask, sendTask, frozenDate } = useApp();
+  const { language, currentUser, users, tasks, saveTask, sendTask, today } = useApp();
   const ar = language === 'ar';
   const tx = (a: string, e: string) => ar ? a : e;
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ export const AssignmentEditor: React.FC = () => {
   const [descriptionAr, setDescriptionAr] = useState(base?.descriptionAr || '');
   const [priority, setPriority] = useState<TaskPriority>(base?.priority || 'MEDIUM');
   const [type, setType] = useState<TaskType>(base?.type || 'NORMAL');
-  const [deadline, setDeadline] = useState(base?.deadline.split(' ')[0] || tomorrowInGaza(frozenDate));
+  const [deadline, setDeadline] = useState(base?.deadline.split(' ')[0] || tomorrowInGaza(today));
   const [time, setTime] = useState(timeInput(base?.deadline));
   const [assignees, setAssignees] = useState<string[]>(base?.recipients.map(recipient => recipient.userId) || []);
   const [referenceUrl, setReferenceUrl] = useState(base?.referenceUrl || '');
@@ -50,7 +50,7 @@ export const AssignmentEditor: React.FC = () => {
   const sentOnce = useRef(false);
   const activeUsers = users.filter(user => user.role === 'EMPLOYEE' && user.isActive);
   const recipientOptions = activeUsers.map(user => ({ value: user.id, label: `${ar ? user.arabicName : user.englishName} · ${ar ? user.jobTitleAr : user.jobTitleEn}` }));
-  const minDate = tomorrowInGaza(frozenDate);
+  const minDate = tomorrowInGaza(today);
   const urlIsValid = !referenceUrl || /^https:\/\/drive\.google\.com\//.test(referenceUrl.trim());
 
   const makeTask = (isDraft: boolean): Task => ({
@@ -65,7 +65,7 @@ export const AssignmentEditor: React.FC = () => {
     priority,
     type,
     deadline: `${deadline} ${storedTime(time)}`,
-    createdAt: '2026-10-31 09:15 AM',
+    createdAt: new Date().toISOString(),
     isDraft,
     projectId: base?.projectId,
     referenceUrl: referenceUrl.trim() || undefined,
@@ -80,7 +80,7 @@ export const AssignmentEditor: React.FC = () => {
         userNameAr: user.arabicName,
         userNameEn: user.englishName,
         status: previous?.status || 'RECEIVED',
-        statusUpdatedAt: previous?.statusUpdatedAt || '2026-10-31 09:15 AM',
+        statusUpdatedAt: previous?.statusUpdatedAt || new Date().toISOString(),
       };
     }),
   });
@@ -129,7 +129,7 @@ export const AssignmentEditor: React.FC = () => {
 
       <Card title={tx('2. الموعد والمستلمون','2. Deadline and recipients')}>
         <div className="grid gap-4 sm:grid-cols-2"><TextField label={tx('تاريخ الاستحقاق','Due date')} type="date" dir="ltr" min={minDate} value={deadline} onChange={event => setDeadline(event.target.value)} requiredIndicator/><TextField label="وقت الاستحقاق" type="time" dir="ltr" value={time} onChange={event => setTime(event.target.value)} requiredIndicator/></div>
-        <p className="text-xs mt-2">{tx(`أقرب تاريخ متاح: ${minDate} (بعد اليوم التجريبي ${frozenDate}).`, `Earliest allowed date: ${minDate} (after demo today ${frozenDate}).`)}</p>
+        <p className="text-xs mt-2">{tx(`أقرب تاريخ متاح: ${minDate} (بعد تاريخ اليوم ${today}).`, `Earliest allowed date: ${minDate} (after today ${today}).`)}</p>
         <div className="mt-4"><MultiSelect label={tx('الموظفون المكلفون','Assigned employees')} options={recipientOptions} value={assignees} onChange={setAssignees} requiredIndicator/><div className="flex flex-wrap gap-2 mt-3">{assignees.map(userId=>{const user=users.find(candidate=>candidate.id===userId);return user?<span className="rounded-full bg-brand-lightGray px-3 py-1 text-sm" key={userId}>{ar?user.arabicName:user.englishName}</span>:null})}</div></div>
       </Card>
 

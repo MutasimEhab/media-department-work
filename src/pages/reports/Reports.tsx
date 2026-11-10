@@ -12,7 +12,7 @@ type Employee = ReportEmployee;
 const STATUS_LABELS: Record<string, string> = { assigned: 'مسند', in_progress: 'قيد التنفيذ', submitted: 'مُسلّم', approved: 'معتمد', returned: 'مُعاد للتعديل' };
 
 export const Reports: React.FC<{ department?: boolean }> = ({ department = false }) => {
-  const { currentUser, canAccess } = useApp();
+  const { currentUser, canAccess, institutionLogo } = useApp();
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [person, setPerson] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -70,7 +70,7 @@ export const Reports: React.FC<{ department?: boolean }> = ({ department = false
         id: currentUser.id, arabicName: currentUser.arabicName,
         employeeNumber: currentUser.employeeNumber, jobTitleAr: currentUser.jobTitleAr,
       }];
-      await downloadWorkReportPdf(data.workLogs, reportEmployees, from, to, person || (!department ? currentUser.id : ''));
+      await downloadWorkReportPdf(data.workLogs, reportEmployees, from, to, person || (!department ? currentUser.id : ''), institutionLogo);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'تعذر إنشاء ملف PDF.');
     } finally {

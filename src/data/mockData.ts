@@ -1,6 +1,5 @@
 import { User, Task, Project, Circular, WorkLog, NotificationItem, MonthlyScoreFixture } from '../types';
 
-export const FROZEN_DEMO_DATE = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Gaza' }).format(new Date());
 
 export const MOCK_USERS: User[] = [
   {
