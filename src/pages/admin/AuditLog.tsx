@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { formatArabicDateTime } from '../../utils/dateFormatting';
+import { useApp } from '../../context/AppContext';
 
 type AuditEvent = {
   id: string;
@@ -14,6 +16,7 @@ type AuditEvent = {
 };
 
 const actionNames: Record<string, string> = {
+  'audit_logs.delete': 'حذف سجلات من سجل التدقيق',
   'user.create': 'إنشاء حساب',
   'user.profile.update': 'تعديل بيانات حساب',
   'user.own_profile.update': 'تعديل الملف الشخصي',
@@ -57,16 +60,23 @@ function exportCsv(events: AuditEvent[]) {
 }
 
 export const AuditLog: React.FC = () => {
+  const { currentUser } = useApp();
   const [query, setQuery] = useState('');
   const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+  const isSystemAdmin = currentUser.role === 'ADMIN';
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError('');
+    setSelectedIds([]);
     const timer = window.setTimeout(() => {
       fetch(`/api/audit-logs?q=${encodeURIComponent(query)}&offset=0`, { credentials: 'include' })
         .then(async response => {
@@ -78,7 +88,40 @@ export const AuditLog: React.FC = () => {
         .finally(() => { if (!cancelled) setLoading(false); });
     }, 200);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [query]);
+  }, [query, refreshKey]);
+
+  const allLoadedSelected = events.length > 0 && events.every(event => selectedIds.includes(event.id));
+
+  function toggleAllLoaded() {
+    setSelectedIds(current => allLoadedSelected ? [] : [...new Set([...current, ...events.map(event => event.id)])]);
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  }
+
+  async function deleteSelected() {
+    if (!selectedIds.length || deleting) return;
+    if (!window.confirm(`سيتم حذف ${selectedIds.length} سجل تدقيق نهائياً، ولن يمكن استرجاع تفاصيلها. سيبقى حدث موجز يوثق عملية الحذف. هل تريد المتابعة؟`)) return;
+    setDeleting(true);
+    setError('');
+    try {
+      const response = await fetch('/api/audit-logs', {
+        method: 'DELETE', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const payload = await response.json() as { deletedCount?: number; message?: string };
+      if (!response.ok) throw new Error(payload.message || 'تعذر حذف السجلات المحددة.');
+      setSelectedIds([]);
+      setStatus(`تم حذف ${payload.deletedCount ?? 0} سجل نهائياً. سُجلت عملية الحذف في سجل التدقيق.`);
+      setRefreshKey(value => value + 1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function loadMore() {
     if (nextOffset === null) return;
@@ -96,12 +139,13 @@ export const AuditLog: React.FC = () => {
 
   return <main className="space-y-4" dir="rtl">
     <header className="app-page-heading"><h1 className="mt-2 text-2xl font-bold">سجل التدقيق</h1><p>أحداث محفوظة في قاعدة البيانات مع صلاحيات عرض على الخادم.</p></header>
-    <Card><div className="flex flex-wrap gap-2"><input className="min-h-11 flex-1 rounded-input border border-brand-border p-2" value={query} onChange={event => setQuery(event.target.value)} placeholder="بحث بالمنفذ أو العملية أو الكيان"/><Button variant="outline" disabled={!events.length} onClick={() => exportCsv(events)}>تنزيل النتائج CSV</Button></div></Card>
+    <Card><div className="flex flex-wrap items-center gap-2"><input className="min-h-11 flex-1 rounded-input border border-brand-border p-2" value={query} onChange={event => { setQuery(event.target.value); setStatus(''); }} placeholder="بحث بالمنفذ أو العملية أو الكيان"/><Button variant="outline" disabled={!events.length} onClick={() => exportCsv(events)}>تنزيل النتائج CSV</Button>{isSystemAdmin&&<><Button variant="outline" disabled={!events.length||loading||deleting} onClick={toggleAllLoaded}>{allLoadedSelected?'إلغاء تحديد الكل':'تحديد الكل (المحمّل)'}</Button><Button variant="outline" disabled={!selectedIds.length||selectedIds.length>500||loading||deleting} onClick={() => void deleteSelected()}>{deleting?'جارٍ الحذف…':`حذف المحدد (${selectedIds.length})`}</Button></>}</div>{isSystemAdmin&&<p className="mt-2 text-xs text-brand-charcoal/70">التحديد يشمل السجلات المحمّلة حالياً فقط. يمكن تحميل المزيد ثم تحديدها؛ أقصى عدد للحذف في العملية الواحدة 500 سجل.</p>}</Card>
     {error && <Card><p role="alert">{error}</p></Card>}
+    {status && <Card><p role="status" className="text-green-800">{status}</p></Card>}
     {loading && !events.length && <Card>جارٍ تحميل الأحداث…</Card>}
     {!loading && !error && !events.length && <Card>لا توجد أحداث مطابقة.</Card>}
     {events.map(event => <Card key={event.id}>
-      <div className="flex flex-wrap items-start justify-between gap-2"><div><b>{actionNames[event.action] ?? event.action}</b><p>{event.actorNameAr}{event.username ? ` · ${event.username}` : ''}</p><p className="text-sm">{event.entityType}{event.entityId ? ` · ${event.entityId}` : ''}</p></div><time dir="ltr" className="text-sm">{new Date(event.createdAt).toLocaleString('en-GB')}</time></div>
+      <div className="flex flex-wrap items-start justify-between gap-2"><div className="flex items-start gap-3">{isSystemAdmin&&<input type="checkbox" aria-label={`تحديد سجل ${actionNames[event.action] ?? event.action}`} checked={selectedIds.includes(event.id)} onChange={() => toggleSelected(event.id)} className="mt-1 h-4 w-4 accent-brand-magenta"/>}<div><b>{actionNames[event.action] ?? event.action}</b><p>{event.actorNameAr}{event.username ? ` · ${event.username}` : ''}</p><p className="text-sm">{event.entityType}{event.entityId ? ` · ${event.entityId}` : ''}</p></div></div><time className="text-sm">{formatArabicDateTime(event.createdAt)}</time></div>
       {Object.keys(event.metadata ?? {}).length > 0 && <details className="mt-2"><summary className="cursor-pointer text-sm">تفاصيل الحدث</summary><pre dir="ltr" className="mt-2 overflow-auto whitespace-pre-wrap rounded-lg bg-brand-lightGray p-3 text-xs">{JSON.stringify(event.metadata, null, 2)}</pre></details>}
     </Card>)}
     {nextOffset !== null && <Button disabled={loading} variant="outline" onClick={() => void loadMore()}>{loading ? 'جارٍ التحميل…' : 'تحميل المزيد'}</Button>}

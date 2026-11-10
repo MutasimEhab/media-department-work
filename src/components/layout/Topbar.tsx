@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Wifi, WifiOff, Search, Sun, Moon, Sparkles, X } from 'lucide-react';
+import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Wifi, WifiOff, Search, Sun, Moon } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
@@ -9,8 +9,6 @@ export const Topbar: React.FC = () => {
   const {
     language,
     currentUser,
-    welcomeGreetingOpen,
-    dismissWelcomeGreeting,
     signOut,
     unreadNotificationCount,
     notifications,
@@ -35,12 +33,6 @@ export const Topbar: React.FC = () => {
   const location = useLocation();
   useEscapeKey(openMenu !== null, () => setOpenMenu(null));
   useEscapeKey(searchOpen, () => { setSearchOpen(false); setSearchQuery(''); });
-  useEscapeKey(welcomeGreetingOpen, dismissWelcomeGreeting);
-  useEffect(() => {
-    if (!welcomeGreetingOpen) return;
-    const timer = window.setTimeout(dismissWelcomeGreeting, 7000);
-    return () => window.clearTimeout(timer);
-  }, [welcomeGreetingOpen, dismissWelcomeGreeting]);
   useEffect(() => setOpenMenu(null), [location.pathname]);
   useEffect(() => {
     const online = () => setIsOnline(true);
@@ -230,27 +222,6 @@ export const Topbar: React.FC = () => {
           )}
         </div>
       </div>
-      {welcomeGreetingOpen && <div dir="rtl" className="fixed inset-0 z-[60] grid place-items-center p-4 sm:p-6">
-        <div aria-hidden="true" className="welcome-backdrop absolute inset-0 bg-slate-950/40 backdrop-blur-sm" />
-        <section aria-label="رسالة ترحيب" aria-live="polite" role="status" className="welcome-greeting-panel relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-dialog ring-1 ring-black/5">
-          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-l from-brand-magenta via-brand-plum to-brand-magenta" />
-          <div aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-48 w-48 rounded-full bg-brand-magenta/5 blur-2xl" />
-          <button type="button" onClick={dismissWelcomeGreeting} className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-brand-lightGray/70 text-brand-charcoal transition hover:bg-brand-lightGray focus:outline-none focus:ring-2 focus:ring-brand-plum" aria-label="إغلاق رسالة الترحيب"><X className="h-4 w-4" /></button>
-          <div className="relative flex flex-col items-center px-6 pb-7 pt-9 text-center sm:px-9 sm:pb-9 sm:pt-11">
-            <div className="relative mb-5 h-[5.25rem] w-[5.25rem]">
-              <div className="absolute -inset-2 rounded-[1.8rem] bg-brand-magenta/10 blur-sm" />
-              <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[1.5rem] border border-brand-plum/15 bg-brand-plum text-3xl font-bold text-white shadow-card">
-                {currentUser.avatar ? <img src={currentUser.avatar} alt="" className="h-full w-full object-cover" /> : currentUser.arabicName.charAt(0)}
-              </div>
-              <span className="absolute -bottom-2 -left-2 flex h-8 w-8 items-center justify-center rounded-full border-[3px] border-white bg-brand-magenta text-white shadow-sm"><Sparkles className="h-3.5 w-3.5" /></span>
-            </div>
-            <p className="text-xs font-semibold text-brand-plum">مرحباً بك في نظام إدارة أعمال دائرة الإعلام</p>
-            <h2 className="mt-2 text-xl font-bold text-brand-darkText sm:text-2xl">أهلاً وسهلاً، {currentUser.arabicName}</h2>
-            <p className="mt-2 max-w-sm text-sm text-brand-charcoal">{currentUser.jobTitleAr} · نتمنى لك يوماً موفقاً.</p>
-          </div>
-          <div className="h-1 w-full bg-brand-plum/10"><div className="welcome-progress h-full bg-brand-magenta" /></div>
-        </section>
-      </div>}
       {searchOpen && <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 px-3 pt-[12vh]" onMouseDown={event => { if (event.target === event.currentTarget) { setSearchOpen(false); setSearchQuery(''); } }}>
         <section role="dialog" aria-modal="true" aria-label="بحث شامل" className="w-full max-w-2xl overflow-hidden rounded-2xl border border-brand-border bg-white shadow-dialog">
           <div className="flex items-center gap-3 border-b border-brand-border px-4 py-3"><Search size={20} className="shrink-0 text-brand-plum" /><input autoFocus value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="ابحث في التكليفات والمشاريع والتعاميم وسجلات العمل" className="min-h-11 flex-1 border-0 bg-transparent text-sm outline-none" /><button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} aria-label="إغلاق البحث" className="rounded p-2 text-brand-charcoal hover:bg-brand-lightGray">×</button></div>

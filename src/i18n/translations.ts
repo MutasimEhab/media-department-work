@@ -20,7 +20,7 @@ export const translations = {
       profile: 'الملف الشخصي',
       breadcrumbs: {
         home: 'الرئيسية',
-        dashboard: 'لوحة التحكم',
+        dashboard: 'الرئيسية',
         assignments: 'التكليفات',
         projects: 'المشاريع',
         circulars: 'التعاميم',
@@ -34,7 +34,7 @@ export const translations = {
       },
     },
     nav: {
-      dashboard: 'لوحة التحكم',
+      dashboard: 'الرئيسية',
       addWork: 'إضافة عمل',
       myTimesheet: 'الكشف الخاص بي',
       dailyWork: 'العمل اليومي',

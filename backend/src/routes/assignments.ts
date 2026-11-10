@@ -41,7 +41,7 @@ function mapRows(rows: Array<Record<string, any>>) {
         statusUpdatedAt: row.status_updated_at, submissionLinks: row.submission_links ?? [],
         submissionLink: row.submission_links?.[0], submissionNote: row.delivery_note_ar ?? undefined,
         reviewedBy: row.reviewed_by_name ?? undefined, reviewNote: row.review_note_ar ?? undefined,
-        firstSubmittedAt: row.first_submitted_at ? new Date(row.first_submitted_at).toLocaleString('en-GB', { timeZone: 'Asia/Gaza' }) : undefined,
+        firstSubmittedAt: row.first_submitted_at ? new Date(row.first_submitted_at).toLocaleString('ar-PS', { timeZone: 'Asia/Gaza', dateStyle: 'medium', timeStyle: 'short', hour12: true, numberingSystem: 'latn' }) : undefined,
       });
     }
   }

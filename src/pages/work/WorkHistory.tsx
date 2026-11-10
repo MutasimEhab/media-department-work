@@ -7,6 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { WorkLog } from '../../types';
 import { downloadCsv } from '../../utils/downloadCsv';
+import { formatArabicWorkDate } from '../../utils/dateFormatting';
 
 export const WorkHistory: React.FC = () => {
   const { language, currentUser, workLogs, tasks, projects, updateWorkLog, deleteWorkLog } = useApp();
@@ -68,7 +69,7 @@ export const WorkHistory: React.FC = () => {
   };
 
   const columns = [
-    { key: 'date', header: tx('التاريخ', 'Date') },
+    { key: 'date', header: tx('التاريخ', 'Date'), render: (row: WorkLog) => formatArabicWorkDate(row.date) },
     { key: 'activityAr', header: tx('تفاصيل العمل', 'Work details'), render: (row: WorkLog) => <button className="underline text-brand-plum" onClick={() => setSelected(row.id)}>{row.activityAr}</button> },
     { key: 'area', header: tx('المنطقة', 'Area') },
     { key: 'location', header: tx('النمط', 'Mode'), render: (row: WorkLog) => row.location === 'OFFICE' ? tx('المكتب', 'Office') : tx('الميدان', 'Field') },
@@ -76,7 +77,7 @@ export const WorkHistory: React.FC = () => {
     ...(canEditOwnLogs ? [{ key: 'actions', header: tx('الإجراءات', 'Actions'), render: (row: WorkLog) => <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => startEditing(row)}>{tx('تعديل', 'Edit')}</Button><Button size="sm" variant="outline" onClick={() => void permanentlyDelete(row)}>{tx('حذف', 'Delete')}</Button></div> }] : []),
   ];
 
-  return <main className="space-y-5">
+  return <main className="space-y-5 printable-report">
     <header className="app-page-heading">
       <h1 className="mt-2 text-2xl font-bold">{tx('الكشف الخاص بي', 'My timesheet')}</h1>
       <p>{tx('سجلاتك محفوظة في قاعدة النظام. يمكنك تعديل سجلك أو حذفه نهائياً.', 'Your work logs are saved in the system database. You can edit or permanently delete your own entries.')}</p>
@@ -85,8 +86,8 @@ export const WorkHistory: React.FC = () => {
     <Card>
       <div className="border-b border-brand-border pb-3"><h2 className="font-subheading font-bold">{tx('فلترة كشف الأعمال حسب الفترة', 'Filter work log by date range')}</h2></div>
       <div className="grid gap-3 pt-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="text-sm">{tx('من تاريخ', 'From date')}<input type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD" className="mt-1 w-full rounded-input border border-brand-border p-2.5" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label>
-        <label className="text-sm">{tx('إلى تاريخ', 'To date')}<input type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD" className="mt-1 w-full rounded-input border border-brand-border p-2.5" value={toDate} onChange={event => setToDate(event.target.value)} /></label>
+        <label className="text-sm">{tx('من تاريخ', 'From date')}<input type="date" dir="ltr" className="mt-1 w-full rounded-input border border-brand-border p-2.5" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label>
+        <label className="text-sm">{tx('إلى تاريخ', 'To date')}<input type="date" dir="ltr" className="mt-1 w-full rounded-input border border-brand-border p-2.5" value={toDate} onChange={event => setToDate(event.target.value)} /></label>
         <label className="text-sm">{tx('بحث بالتفاصيل', 'Search details')}<input className="mt-1 w-full rounded-input border border-brand-border p-2.5" placeholder={tx('كلمة أو منطقة', 'Keyword or area')} value={query} onChange={event => setQuery(event.target.value)} /></label>
         <label className="text-sm">{tx('مكان العمل', 'Work location')}<select className="mt-1 w-full rounded-input border border-brand-border p-2.5" value={mode} onChange={event => setMode(event.target.value)}><option value="">{tx('الكل', 'All')}</option><option value="OFFICE">{tx('المكتب', 'Office')}</option><option value="FIELD">{tx('الميدان', 'Field')}</option></select></label>
         <label className="text-sm sm:col-span-2">{tx('المنطقة', 'Area')}<input className="mt-1 w-full rounded-input border border-brand-border p-2.5" placeholder={tx('تصفية حسب المنطقة', 'Filter by area')} value={area} onChange={event => setArea(event.target.value)} /></label>
@@ -94,7 +95,7 @@ export const WorkHistory: React.FC = () => {
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="me-auto text-xs text-brand-charcoal/70">{tx('السجلات المطابقة', 'Matching records')}: {rows.length}</span>
         <Button size="sm" variant="secondary" onClick={() => { setFromDate(''); setToDate(''); setQuery(''); setMode(''); setArea(''); }}>{tx('مسح الفلتر', 'Clear filters')}</Button>
-        <Button size="sm" variant="outline" onClick={() => window.print()}>{tx('طباعة / PDF', 'Print / PDF')}</Button>
+        <Button size="sm" variant="outline" onClick={() => window.print()}>{tx('تصدير PDF / طباعة', 'Export PDF / Print')}</Button>
         <Button size="sm" variant="outline" onClick={exportCsv}>{tx('تنزيل CSV', 'Download CSV')}</Button>
         <Link to="/app/work/new"><Button size="sm">{tx('إضافة عمل', 'Add work')}</Button></Link>
       </div>
@@ -102,13 +103,13 @@ export const WorkHistory: React.FC = () => {
 
     {rows.length === 0 ? <Card><p>{workLogs.some(log => log.userId === currentUser.id) ? tx('لا توجد نتائج مطابقة.', 'No matching records.') : tx('لا توجد سجلات بعد. ابدأ بتسجيل عمل اليوم.', 'No records yet. Start by logging today’s work.')}</p></Card>
       : <><div className="hidden md:block"><Table columns={columns} data={rows} keyExtractor={row => row.id} /></div>
-        <div className="space-y-3 md:hidden">{rows.map(row => <Card key={row.id}><p dir="ltr">{row.date} · {row.time}</p><b>{row.activityAr}</b><p>{row.area || '—'} · {row.location === 'OFFICE' ? tx('المكتب', 'Office') : tx('الميدان', 'Field')}</p><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setSelected(row.id)}>{tx('تفاصيل', 'Details')}</Button>{canEditOwnLogs&&<><Button size="sm" onClick={() => startEditing(row)}>{tx('تعديل', 'Edit')}</Button><Button size="sm" variant="outline" onClick={() => void permanentlyDelete(row)}>{tx('حذف', 'Delete')}</Button></>}</div></Card>)}</div></>}
+        <div className="space-y-3 md:hidden">{rows.map(row => <Card key={row.id}><p>{formatArabicWorkDate(row.date)} · <span dir="ltr">{row.time}</span></p><b>{row.activityAr}</b><p>{row.area || '—'} · {row.location === 'OFFICE' ? tx('المكتب', 'Office') : tx('الميدان', 'Field')}</p><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setSelected(row.id)}>{tx('تفاصيل', 'Details')}</Button>{canEditOwnLogs&&<><Button size="sm" onClick={() => startEditing(row)}>{tx('تعديل', 'Edit')}</Button><Button size="sm" variant="outline" onClick={() => void permanentlyDelete(row)}>{tx('حذف', 'Delete')}</Button></>}</div></Card>)}</div></>}
 
     {detail && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) { setSelected(null); setEditing(false); } }}>
       <section className="max-h-[90vh] w-full max-w-xl space-y-3 overflow-y-auto rounded-xl bg-white p-6 text-brand-darkText" role="dialog" aria-modal="true" aria-labelledby="work-detail-title">
-        <div className="flex items-center justify-between"><h2 id="work-detail-title" className="text-xl font-bold">{tx('سجل العمل', 'Work log')} · {detail.date}</h2><button onClick={() => { setSelected(null); setEditing(false); }} aria-label={tx('إغلاق', 'Close')}>×</button></div>
+        <div className="flex items-center justify-between"><h2 id="work-detail-title" className="text-xl font-bold">{tx('سجل العمل', 'Work log')} · {formatArabicWorkDate(detail.date)}</h2><button onClick={() => { setSelected(null); setEditing(false); }} aria-label={tx('إغلاق', 'Close')}>×</button></div>
         {!editing ? <>
-          <p dir="ltr">{detail.date} · {detail.time}</p><p className="font-bold">{detail.activityAr}</p><p>{detail.area || '—'} · {detail.location === 'OFFICE' ? tx('المكتب', 'Office') : tx('الميدان', 'Field')}</p>
+          <p>{formatArabicWorkDate(detail.date)} · <span dir="ltr">{detail.time}</span></p><p className="font-bold">{detail.activityAr}</p><p>{detail.area || '—'} · {detail.location === 'OFFICE' ? tx('المكتب', 'Office') : tx('الميدان', 'Field')}</p>
           {detail.projectId && <p>{tx('المشروع', 'Project')}: {projects.find(project => project.id === detail.projectId)?.titleAr}</p>}
           {detail.relatedTaskId && <p>{tx('التكليف', 'Assignment')}: {tasks.find(task => task.id === detail.relatedTaskId)?.titleAr}</p>}
           {detail.outputLink && <a className="underline text-brand-plum" href={detail.outputLink} target="_blank" rel="noreferrer">{tx('رابط المخرجات', 'Output link')}</a>}

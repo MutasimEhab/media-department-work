@@ -50,4 +50,45 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
   }
 });
 
+router.delete('/', async (request: AuthenticatedRequest, response) => {
+  const actor = request.authUser!;
+  if (actor.roleCode !== 'system_admin') {
+    response.status(403).json({ message: 'الحذف النهائي لسجل التدقيق متاح لمدير النظام فقط.' });
+    return;
+  }
+
+  const rawIds: unknown = request.body?.ids;
+  const ids = Array.isArray(rawIds) ? [...new Set(rawIds.filter((id): id is string => typeof id === 'string'))] : [];
+  if (!ids.length || ids.length > 500 || ids.some(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
+    response.status(400).json({ message: 'حدد سجلاً واحداً على الأقل، وبحد أقصى 500 سجل في المرة الواحدة.' });
+    return;
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const deleted = await client.query<{ id: string }>(
+      'DELETE FROM audit_logs WHERE id = ANY($1::uuid[]) RETURNING id',
+      [ids],
+    );
+    if (!deleted.rowCount) {
+      await client.query('ROLLBACK');
+      response.status(404).json({ message: 'لم يتم العثور على السجلات المحددة.' });
+      return;
+    }
+    await client.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, metadata)
+       VALUES ($1, 'audit_logs.delete', 'audit_logs', $2::jsonb)`,
+      [actor.id, JSON.stringify({ deletedCount: deleted.rowCount, deletedIds: deleted.rows.map(row => row.id) })],
+    );
+    await client.query('COMMIT');
+    response.json({ deletedCount: deleted.rowCount });
+  } catch {
+    await client.query('ROLLBACK');
+    response.status(503).json({ message: 'تعذر حذف السجلات المحددة.' });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;

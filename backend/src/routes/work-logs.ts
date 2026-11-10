@@ -125,7 +125,8 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
     if (workDate < todayInGaza()) {
       const exception = await db.query(
         `SELECT 1 FROM work_date_exceptions
-          WHERE user_id = $1 AND work_date = $2::date AND revoked_at IS NULL`,
+          WHERE user_id = $1 AND work_date = $2::date AND revoked_at IS NULL
+            AND (expires_at IS NULL OR expires_at > now())`,
         [actor.id, workDate],
       );
       if (!exception.rowCount) {

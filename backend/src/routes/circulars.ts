@@ -29,7 +29,7 @@ function mapCircularRows(rows: Array<Record<string, any>>) {
       circular.recipients.push({
         userId: row.recipient_user_id, userNameAr: row.recipient_name, userNameEn: row.recipient_name,
         hasAcknowledged: Boolean(row.acknowledged_at),
-        acknowledgedAt: row.acknowledged_at ? new Date(row.acknowledged_at).toLocaleString('en-GB', { timeZone: 'Asia/Gaza' }) : undefined,
+        acknowledgedAt: row.acknowledged_at ? new Date(row.acknowledged_at).toLocaleString('ar-PS', { timeZone: 'Asia/Gaza', dateStyle: 'medium', timeStyle: 'short', hour12: true, numberingSystem: 'latn' }) : undefined,
         reminderCount: row.reminder_count,
       });
     }

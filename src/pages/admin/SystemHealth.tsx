@@ -4,6 +4,7 @@ import { Activity, Bell, BriefcaseBusiness, ClipboardList, FolderKanban, Users }
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
+import { formatArabicDateTime } from '../../utils/dateFormatting';
 
 type HealthMetrics = {
   activeUsers: number;
@@ -54,8 +55,8 @@ export const SystemHealth: React.FC = () => {
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{tiles.map(({ label, value, icon: Icon }) => <Card key={label}><div className="flex items-center justify-between gap-3"><span>{label}</span><Icon className="text-brand-plum" size={20}/></div><b className="mt-3 block text-2xl" dir="ltr">{value ?? '—'}</b></Card>)}</section>
     <Card title="اتصال قاعدة البيانات">
       <p className="font-bold">{metrics ? 'متصل بقاعدة Neon' : loading ? 'جارٍ التحقق…' : 'غير متاح'}</p>
-      {metrics?.databaseTime && <p className="mt-2 text-sm">آخر تحقق: <time dir="ltr">{new Date(metrics.databaseTime).toLocaleString('en-GB')}</time></p>}
-      <p className="mt-2 text-sm">آخر حدث مسجل: {metrics?.latestActivity ? <time dir="ltr">{new Date(metrics.latestActivity).toLocaleString('en-GB')}</time> : 'لا توجد أحداث مسجلة.'}</p>
+      {metrics?.databaseTime && <p className="mt-2 text-sm">آخر تحقق: <time>{formatArabicDateTime(metrics.databaseTime)}</time></p>}
+      <p className="mt-2 text-sm">آخر حدث مسجل: {metrics?.latestActivity ? <time>{formatArabicDateTime(metrics.latestActivity)}</time> : 'لا توجد أحداث مسجلة.'}</p>
     </Card>
     <Card title="سجل التدقيق"><p>يعرض العمليات المسجلة فعلياً، وتُحفظ التعديلات التي يدعمها النظام في قاعدة البيانات.</p><Link className="mt-3 inline-block text-brand-plum underline" to="/app/audit-log">فتح سجل التدقيق</Link></Card>
     <Card title="التنبيهات الخارجية والنسخ الاحتياطي"><p>البريد وSMS غير مفعّلين لعدم ربط مزود إرسال. النسخ الاحتياطي الآمن يتم إعداده من Neon؛ هذه الصفحة لا تدّعي وجود نسخة احتياطية لم تُنشأ.</p></Card>

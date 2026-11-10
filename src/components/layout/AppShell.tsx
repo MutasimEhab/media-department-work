@@ -6,6 +6,7 @@ import { DemoBanner } from './DemoBanner';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { EnglishDigits } from '../ui/EnglishDigits';
+import { WelcomeGreeting } from './WelcomeGreeting';
 
 export const AppShell: React.FC = () => {
   const { isAuthenticated, isAuthLoading, theme } = useApp();
@@ -17,6 +18,7 @@ export const AppShell: React.FC = () => {
       <EnglishDigits />
       <DemoBanner />
       <Topbar />
+      <WelcomeGreeting />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <div className="min-w-0 flex-1 overflow-y-auto">
