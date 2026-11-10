@@ -162,7 +162,7 @@ async function saveCircular(request: AuthenticatedRequest, response: import('exp
         await client.query(
           `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id, action_url)
            VALUES ($1, 'CIRCULAR_PUBLISHED', 'تعميم جديد', $2, 'circular', $3, $4)`,
-          [userId, title, circularId, `/app/circulars/${circularId}`],
+          [userId, `تم نشر تعميم جديد بعنوان «${title}». اضغط لعرضه والاطلاع على المطلوب.`, circularId, '/app/circulars'],
         );
       }
     }
@@ -172,8 +172,8 @@ async function saveCircular(request: AuthenticatedRequest, response: import('exp
       [actor.id, publish ? 'circular.publish' : 'circular.draft.save', circularId,
         JSON.stringify({ audience, recipientCount: selectedRecipients.length, parentId })],
     );
+    const saved = await client.query(`${circularSelect} WHERE c.id = $1 ORDER BY recipient.full_name_ar`, [circularId]);
     await client.query('COMMIT');
-    const saved = await db.query(`${circularSelect} WHERE c.id = $1 ORDER BY recipient.full_name_ar`, [circularId]);
     response.status(id ? 200 : 201).json({ circular: mapCircularRows(saved.rows)[0] });
   } catch {
     await client.query('ROLLBACK');

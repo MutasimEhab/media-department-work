@@ -398,6 +398,61 @@ router.patch('/:userId/profile', async (request: AuthenticatedRequest, response)
   }
 });
 
+router.patch('/:userId/department', async (request: AuthenticatedRequest, response) => {
+  if (request.authUser!.roleCode !== 'system_admin') {
+    response.status(403).json({ message: 'ربط الحساب بدائرة متاح لمدير النظام فقط.' });
+    return;
+  }
+  const userId = routeUserId(request);
+  const departmentId = typeof request.body?.departmentId === 'string' ? request.body.departmentId : '';
+  if (!departmentId) {
+    response.status(400).json({ message: 'اختر الدائرة أولاً.' });
+    return;
+  }
+  try {
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      const account = await client.query<{ id: string; department_id: string | null; full_name_ar: string }>(
+        'SELECT id, department_id, full_name_ar FROM users WHERE id = $1 FOR UPDATE', [userId],
+      );
+      if (!account.rowCount) {
+        await client.query('ROLLBACK');
+        response.status(404).json({ message: 'الحساب غير موجود.' });
+        return;
+      }
+      const department = await client.query<{ id: string; name_ar: string }>(
+        'SELECT id, name_ar FROM departments WHERE id = $1', [departmentId],
+      );
+      if (!department.rowCount) {
+        await client.query('ROLLBACK');
+        response.status(404).json({ message: 'الدائرة المحددة غير موجودة.' });
+        return;
+      }
+      await client.query('UPDATE users SET department_id = $2, updated_at = now() WHERE id = $1', [userId, departmentId]);
+      await client.query(
+        `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+         VALUES ($1, 'user.department.assign', 'users', $2, $3::jsonb)`,
+        [request.authUser!.id, userId, JSON.stringify({
+          accountName: account.rows[0]!.full_name_ar,
+          previousDepartmentId: account.rows[0]!.department_id,
+          departmentId,
+          departmentNameAr: department.rows[0]!.name_ar,
+        })],
+      );
+      await client.query('COMMIT');
+      response.json({ department: { id: departmentId, nameAr: department.rows[0]!.name_ar } });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch {
+    response.status(503).json({ message: 'تعذر ربط الحساب بالدائرة حالياً.' });
+  }
+});
+
 router.get('/:userId/permissions', async (request: AuthenticatedRequest, response) => {
   const { target, allowed } = await findManageableTarget(request, routeUserId(request));
   if (!target) {

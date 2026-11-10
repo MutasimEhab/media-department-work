@@ -52,6 +52,9 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
   const [profileTarget, setProfileTarget] = useState<User | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileForm, setProfileForm] = useState({ jobTitleAr: '', employeeNumber: '' });
+  const [departmentTarget, setDepartmentTarget] = useState<User | null>(null);
+  const [departmentSelection, setDepartmentSelection] = useState('');
+  const [departmentSaving, setDepartmentSaving] = useState(false);
   const [form, setForm] = useState({
     arabicName: '', username: '', email: '', jobTitleAr: '', employeeNumber: '', mobile: '',
     accountTypeCode: 'employee', role: 'EMPLOYEE' as UserRole, departmentId: '', password: '',
@@ -222,6 +225,37 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
     }
   }
 
+  function openDepartmentLink(user: User) {
+    setDepartmentTarget(user);
+    setDepartmentSelection(departments.find(item => item.nameAr === user.departmentAr)?.id || '');
+    setError('');
+  }
+
+  async function saveDepartmentLink(event: React.FormEvent) {
+    event.preventDefault();
+    if (!departmentTarget || !departmentSelection) return;
+    setDepartmentSaving(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(departmentTarget.id)}/department`, {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ departmentId: departmentSelection }),
+      });
+      const payload = await readApiPayload(response, 'تعذر ربط الحساب بالدائرة.');
+      const department = payload.department as DepartmentOption;
+      if (departmentTarget.id === currentUser.id) {
+        setCurrentUser({ ...currentUser, departmentAr: department.nameAr, departmentEn: department.nameAr });
+      }
+      setDepartmentTarget(null);
+      await loadUsers();
+      setNotice(`تم ربط حساب ${departmentTarget.arabicName} بدائرة ${department.nameAr}.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+    } finally {
+      setDepartmentSaving(false);
+    }
+  }
+
   async function changeAccountStatus(user: User, isActive: boolean) {
     const action = isActive ? 'إعادة تفعيل' : 'إيقاف';
     if (!window.confirm(`هل تريد ${action} حساب ${user.arabicName}؟ ${isActive ? '' : 'سيُمنع من الدخول فوراً، وستبقى سجلاته محفوظة.'}`)) return;
@@ -304,11 +338,12 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
           || currentUser.role === 'MANAGER' && ['EMPLOYEE', 'DEPUTY'].includes(user.role)
           || currentUser.role === 'DEPUTY' && user.role === 'EMPLOYEE';
         const accountTypeName = user.accountTypeNameAr || roleLabels[user.role];
-        return <article key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-border p-4"><div><b>{user.arabicName}</b><p>{user.jobTitleAr} · {accountTypeName} · {user.isActive ? 'نشط' : 'غير نشط'}</p><p>الرقم الوظيفي: <span dir="ltr">{user.employeeNumber || 'غير محدد'}</span></p><p>{user.departmentAr}</p><p dir="ltr">اسم المستخدم: {user.username} · البريد: {user.email || 'غير مسجل'} · {user.mobile || '—'}</p></div><div className="flex flex-wrap gap-2">{canEditProfile && <Button size="sm" variant="outline" onClick={() => editProfile(user)}>تعديل المسمى والرقم</Button>}{canManageAccount && <><Button size="sm" variant="outline" onClick={() => void openPermissions(user)}>إدارة الصلاحيات</Button><Button size="sm" variant="outline" onClick={() => void changeAccountStatus(user, !user.isActive)}>{user.isActive ? 'إيقاف الحساب' : 'إعادة التفعيل'}</Button><Button size="sm" variant="danger" onClick={() => void deleteAccount(user)}>حذف الحساب</Button></>}</div></article>;
+        return <article key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-border p-4"><div><b>{user.arabicName}</b><p>{user.jobTitleAr} · {accountTypeName} · {user.isActive ? 'نشط' : 'غير نشط'}</p><p>الرقم الوظيفي: <span dir="ltr">{user.employeeNumber || 'غير محدد'}</span></p><p>{user.departmentAr || 'غير مرتبط بدائرة'}</p><p dir="ltr">اسم المستخدم: {user.username} · البريد: {user.email || 'غير مسجل'} · {user.mobile || '—'}</p></div><div className="flex flex-wrap gap-2">{currentUser.role === 'ADMIN' && <Button size="sm" variant="outline" onClick={() => openDepartmentLink(user)}>ربط الدائرة</Button>}{canEditProfile && <Button size="sm" variant="outline" onClick={() => editProfile(user)}>تعديل المسمى والرقم</Button>}{canManageAccount && <><Button size="sm" variant="outline" onClick={() => void openPermissions(user)}>إدارة الصلاحيات</Button><Button size="sm" variant="outline" onClick={() => void changeAccountStatus(user, !user.isActive)}>{user.isActive ? 'إيقاف الحساب' : 'إعادة التفعيل'}</Button><Button size="sm" variant="danger" onClick={() => void deleteAccount(user)}>حذف الحساب</Button></>}</div></article>;
       })}</div> : <p className="mt-4">لا توجد حسابات مطابقة.</p>}
     </Card>
 
     {permissionTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !permissionSaving) setPermissionTarget(null); }}><section className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 text-brand-darkText shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="permission-heading"><h2 id="permission-heading" className="text-xl font-bold">صلاحيات {permissionTarget.arabicName}</h2>{permissionLoading ? <p className="mt-4">جارٍ تحميل الصلاحيات…</p> : <div className="mt-4 grid gap-2 sm:grid-cols-2">{permissionOptions.map((permission) => <label key={permission.code} className="flex items-center gap-2 rounded-lg border border-brand-border p-3"><input type="checkbox" checked={permissionSelection.includes(permission.code)} onChange={(event) => setPermissionSelection((current) => event.target.checked ? [...current, permission.code] : current.filter((code) => code !== permission.code))}/><span>{permission.name_ar}</span></label>)}</div>}{error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}<div className="mt-4 flex gap-2"><Button disabled={permissionLoading || permissionSaving} onClick={() => void savePermissions()}>{permissionSaving ? 'جارٍ الحفظ…' : 'حفظ الصلاحيات'}</Button><Button variant="outline" disabled={permissionSaving} onClick={() => setPermissionTarget(null)}>إلغاء</Button></div></section></div>}
     {profileTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !profileSaving) setProfileTarget(null); }}><section className="w-full max-w-lg rounded-xl bg-white p-5 text-brand-darkText shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="profile-heading"><h2 id="profile-heading" className="text-xl font-bold">تعديل بيانات {profileTarget.arabicName}</h2><form className="mt-4 space-y-3" onSubmit={saveProfile}><label className="block text-sm">المسمى الوظيفي<select required className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={profileForm.jobTitleAr} onChange={(event) => setProfileForm({ ...profileForm, jobTitleAr: event.target.value })}>{!jobTitles.some((item) => item.nameAr === profileForm.jobTitleAr) && <option value={profileForm.jobTitleAr}>{profileForm.jobTitleAr}</option>}{jobTitles.map((item) => <option key={item.id} value={item.nameAr}>{item.nameAr}</option>)}</select></label><label className="block text-sm">الرقم الوظيفي (اختياري)<input maxLength={40} dir="ltr" inputMode="numeric" className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={profileForm.employeeNumber} onChange={(event) => setProfileForm({ ...profileForm, employeeNumber: event.target.value })}/></label>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<div className="flex gap-2"><Button type="submit" disabled={profileSaving}>{profileSaving ? 'جارٍ الحفظ…' : 'حفظ التعديل'}</Button><Button type="button" variant="outline" disabled={profileSaving} onClick={() => setProfileTarget(null)}>إلغاء</Button></div></form></section></div>}
+    {departmentTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !departmentSaving) setDepartmentTarget(null); }}><section className="w-full max-w-lg rounded-xl bg-white p-5 text-brand-darkText shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="department-heading"><h2 id="department-heading" className="text-xl font-bold">ربط {departmentTarget.arabicName} بدائرة</h2><p className="mt-2 text-sm">اختر الدائرة التي يتبع لها هذا الحساب.</p><form className="mt-4 space-y-3" onSubmit={saveDepartmentLink}><label className="block text-sm">الدائرة<select required className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={departmentSelection} onChange={(event) => setDepartmentSelection(event.target.value)}><option value="">اختر الدائرة</option>{departments.map(item => <option key={item.id} value={item.id}>{item.nameAr}</option>)}</select></label>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<div className="flex gap-2"><Button type="submit" disabled={departmentSaving || !departmentSelection}>{departmentSaving ? 'جارٍ الربط…' : 'حفظ ربط الدائرة'}</Button><Button type="button" variant="outline" disabled={departmentSaving} onClick={() => setDepartmentTarget(null)}>إلغاء</Button></div></form></section></div>}
   </main>;
 };
