@@ -203,9 +203,9 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
         );
         if (!draft) {
           await client.query(
-            `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id)
-             VALUES ($1, 'TASK_ASSIGNED', 'تكليف عمل جديد', $2, 'assignment', $3)`,
-            [userId, `تم إسناد تكليف جديد إليك: ${title}`, assignmentId],
+            `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id, action_url)
+             VALUES ($1, 'TASK_ASSIGNED', 'تكليف عمل جديد', $2, 'assignment', $3, $4)`,
+            [userId, `أُسند إليك تكليف «${title}». راجع التفاصيل والموعد النهائي من قائمة التكليفات.`, assignmentId, `/app/assignments/${assignmentId}`],
           );
         }
       }
@@ -215,9 +215,7 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
        VALUES ($1, $2, 'assignments', $3, $4::jsonb)`,
       [actor.id, draft ? 'assignment.draft.save' : 'assignment.send', assignmentId, JSON.stringify({ recipientCount: assigneeIds.length })],
     );
-    await client.query('COMMIT');
-
-    const saved = await db.query(
+    const saved = await client.query(
       `SELECT a.id, a.created_by, a.title_ar, a.description_ar, a.priority, a.kind, a.status,
               a.deadline, a.created_at, a.project_id, a.reference_url, a.reminder_options,
               a.notify_email, a.notify_sms, creator.full_name_ar AS creator_name,
@@ -232,6 +230,7 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
          LEFT JOIN users reviewer ON reviewer.id = aa.reviewed_by
         WHERE a.id = $1 ORDER BY aa.created_at ASC`, [assignmentId],
     );
+    await client.query('COMMIT');
     response.status(id ? 200 : 201).json({ task: mapRows(saved.rows)[0] });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -344,9 +343,9 @@ router.patch('/:assignmentId/recipients/:userId', async (request: AuthenticatedR
       const body = nextStatus === 'SUBMITTED' ? `قدّم ${recipient.full_name_ar} تسليماً جديداً للمراجعة.`
         : nextStatus === 'APPROVED' ? 'تم اعتماد تسليمك.' : `يرجى مراجعة الملاحظة: ${reviewNote}`;
       await client.query(
-        `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id)
-         VALUES ($1, $2, $3, $4, 'assignment', $5)`,
-        [notifyUser, nextStatus === 'SUBMITTED' ? 'TASK_SUBMITTED' : 'TASK_ASSIGNED', title, body, taskId],
+        `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id, action_url)
+         VALUES ($1, $2, $3, $4, 'assignment', $5, $6)`,
+        [notifyUser, nextStatus === 'SUBMITTED' ? 'TASK_SUBMITTED' : 'TASK_ASSIGNED', title, body, taskId, `/app/assignments/${taskId}`],
       );
     }
     await client.query('COMMIT');

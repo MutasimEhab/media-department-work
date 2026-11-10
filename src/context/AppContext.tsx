@@ -184,6 +184,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
+    const refreshNotifications = async () => {
+      if (document.visibilityState === 'hidden') return;
+      try {
+        const response = await fetch('/api/notifications', { credentials: 'include', cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json() as { notifications?: NotificationItem[] };
+        if (!cancelled && payload.notifications) setNotifications(payload.notifications);
+      } catch { /* Keep the last saved notification list while offline. */ }
+    };
+    void refreshNotifications();
+    const interval = window.setInterval(() => void refreshNotifications(), 15_000);
+    const onFocus = () => void refreshNotifications();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [isAuthenticated, currentUser.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
     fetch('/api/role-permissions', { credentials: 'include' })
       .then(async response => {
         const payload = await response.json() as { rolePermissions?: RolePermissionOverrides };
@@ -453,7 +478,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTasks(previous => previous.some(existing => existing.id === payload.task!.id)
         ? previous.map(existing => existing.id === payload.task!.id ? payload.task! : existing)
         : [payload.task!, ...previous]);
-      return { ok: true };
+      return { ok: true, task: payload.task };
     } catch {
       return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحفظ التكليف.' };
     }
@@ -463,14 +488,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const sendTask = async (task: Task) => {
     const result = await persistTask({ ...task, isDraft: false });
     if (!result.ok) return result;
-    const sent = { ...task, isDraft: false };
-    const newItems: NotificationItem[] = sent.recipients.map(recipient => ({
-      id: `NTF-${sent.id}-${recipient.userId}`, userId: recipient.userId, type: 'TASK_ASSIGNED',
-      titleAr: 'تكليف عمل جديد', titleEn: 'New assignment',
-      messageAr: `تم إسناد تكليف جديد: ${sent.titleAr}.`, messageEn: `A new assignment was sent: ${sent.titleAr}.`,
-      timestamp: new Date().toISOString(), isRead: false, actionUrl: `/app/assignments/${sent.id}`,
-    }));
-    setNotifications(previous => [...newItems.filter(item => !previous.some(old => old.id === item.id)), ...previous]);
+    try {
+      const response = await fetch('/api/notifications', { credentials: 'include', cache: 'no-store' });
+      if (response.ok) {
+        const payload = await response.json() as { notifications?: NotificationItem[] };
+        if (payload.notifications) setNotifications(payload.notifications);
+      }
+    } catch { /* Notification polling will refresh the list; assignment send already succeeded. */ }
     return { ok: true };
   };
   const updateTask = async (taskId: string, update: (task: Task) => Task) => {
