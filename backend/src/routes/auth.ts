@@ -299,16 +299,18 @@ router.get('/me', async (request, response) => {
   const user = await authenticateRequest(request);
   if (!user) {
     clearSessionCookie(response);
-    response.status(401).json({ code: 'UNAUTHENTICATED', message: 'يرجى تسجيل الدخول للمتابعة.' });
+    // Session bootstrap is also called for signed-out visitors; report that state
+    // as a successful check so it doesn't show as an API error in the browser console.
+    response.json({ authenticated: false, user: null });
     return;
   }
   const dbUser = await findUser(user.username);
   if (!dbUser) {
     clearSessionCookie(response);
-    response.status(401).json({ code: 'UNAUTHENTICATED', message: 'يرجى تسجيل الدخول للمتابعة.' });
+    response.json({ authenticated: false, user: null });
     return;
   }
-  response.json({ user: publicUser(dbUser), permissions: await getEffectivePermissions(user.id, user.accountTypeCode) });
+  response.json({ authenticated: true, user: publicUser(dbUser), permissions: await getEffectivePermissions(user.id, user.accountTypeCode) });
 });
 
 router.post('/logout', async (request, response) => {
