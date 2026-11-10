@@ -22,7 +22,7 @@ export interface User {
 }
 
 export interface WorkDateException {
-  id: string; userId: string; dates: string[]; grantedBy: string; createdAt: string; reason: string; revokedAt?: string;
+  id: string; userId: string; dates: string[]; grantedBy: string; createdAt: string; reason: string; expiresAt?: string; revokedAt?: string;
 }
 
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';

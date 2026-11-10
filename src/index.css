@@ -12,6 +12,24 @@
   animation: welcome-progress 7s linear forwards;
 }
 
+.welcome-backdrop {
+  background: rgba(13, 8, 16, .92);
+  backdrop-filter: blur(20px) saturate(.65);
+  -webkit-backdrop-filter: blur(20px) saturate(.65);
+}
+
+.auth-system-title {
+  width: fit-content;
+  padding: 8px 14px;
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 999px;
+  background: rgba(255,255,255,.13);
+  color: #fff;
+  font-size: .85rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+
 @keyframes welcome-panel-enter {
   from { opacity: 0; transform: translateY(12px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -292,6 +310,36 @@ h1, h2, h3 {
 .app-theme-dark table tbody tr { border-color: var(--app-border); }
 .app-theme-dark .app-page-heading { background: var(--app-surface); border-color: var(--app-border); }
 .app-theme-dark header.sticky { background: #1b151e !important; border-color: var(--app-border) !important; }
+.app-theme-dark [class*="text-brand-charcoal/"],
+.app-theme-dark [class*="text-gray-4"],
+.app-theme-dark [class*="text-gray-5"],
+.app-theme-dark [class*="text-gray-6"],
+.app-theme-dark [class*="text-slate-4"],
+.app-theme-dark [class*="text-slate-5"],
+.app-theme-dark [class*="text-slate-6"],
+.app-theme-dark [class*="text-neutral-4"],
+.app-theme-dark [class*="text-neutral-5"],
+.app-theme-dark [class*="text-neutral-6"],
+.app-theme-dark [class*="text-zinc-4"],
+.app-theme-dark [class*="text-zinc-5"],
+.app-theme-dark [class*="text-zinc-6"],
+.app-theme-dark [class*="text-stone-4"],
+.app-theme-dark [class*="text-stone-5"],
+.app-theme-dark [class*="text-stone-6"] { color: var(--app-muted) !important; }
+.app-theme-dark [class~="bg-brand-lightGray/30"],
+.app-theme-dark [class~="bg-brand-lightGray/40"],
+.app-theme-dark [class~="bg-brand-lightGray/50"],
+.app-theme-dark [class~="bg-brand-lightGray/60"],
+.app-theme-dark [class~="bg-brand-lightGray/80"],
+.app-theme-dark [class~="bg-gray-200"],
+.app-theme-dark [class~="bg-slate-300"],
+.app-theme-dark [class~="bg-neutral-200"],
+.app-theme-dark [class~="bg-zinc-200"],
+.app-theme-dark [class~="bg-stone-200"] { background-color: var(--app-raised) !important; }
+.app-theme-dark [class~="text-brand-darkText/70"],
+.app-theme-dark [class~="text-brand-darkText/80"] { color: var(--app-muted) !important; }
+.app-theme-dark option { background: var(--app-surface); color: var(--app-text); }
+.app-theme-dark a:not([class*="text-"]) { color: var(--app-pink); }
 
 @media (max-width: 1023px) {
   .app-theme-dark aside { background-color: #1b151e !important; border-color: var(--app-border) !important; }
@@ -302,7 +350,7 @@ h1, h2, h3 {
   overflow: hidden;
   max-width: 960px;
   gap: 0;
-  border-radius: 28px;
+  border-radius: 24px;
   background: #fff;
   box-shadow: 0 24px 70px rgba(48, 17, 48, .14);
 }
@@ -312,12 +360,14 @@ h1, h2, h3 {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  gap: 1.25rem;
   padding: clamp(28px, 5vw, 56px);
   color: #fff;
   background: linear-gradient(145deg, #871281, #c80893);
 }
 .auth-page > div > section:first-child .text-brand-plum { color: #fff !important; }
 .auth-page > div > section:first-child h1 { color: #fff; }
+.auth-page > div > section:first-child .auth-system-title { margin-bottom: .25rem; }
 .auth-page > div > section:first-child > img { border-radius: 20px; background: #fff; padding: 10px; }
 .auth-page > div > section:last-child {
   grid-column: 2;
@@ -333,4 +383,13 @@ h1, h2, h3 {
   .auth-page > div { border-radius: 20px; }
   .auth-page > div > section:first-child { grid-column: 1; grid-row: 1; }
   .auth-page > div > section:last-child { grid-column: 1; grid-row: 2; }
+}
+
+@media print {
+  body * { visibility: hidden !important; }
+  .printable-report, .printable-report * { visibility: visible !important; }
+  .printable-report { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; padding: 16px !important; background: #fff !important; color: #111 !important; }
+  .printable-report button, .printable-report input, .printable-report select, .printable-report .no-print { display: none !important; }
+  .printable-report table { width: 100% !important; border-collapse: collapse !important; }
+  .printable-report th, .printable-report td { border: 1px solid #bbb !important; color: #111 !important; padding: 6px !important; }
 }

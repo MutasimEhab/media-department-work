@@ -38,7 +38,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         </div>
 
         <input
-          type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD"
+          type="date" dir="ltr"
           id={inputId}
           disabled={disabled}
           aria-invalid={Boolean(error)}

@@ -48,7 +48,7 @@ export const AssignmentList: React.FC = () => {
       {manager&&<select className="rounded-input border border-brand-border p-2.5" value={employee} onChange={event=>setEmployee(event.target.value)}><option value="">كل الموظفين</option>{users.filter(user=>user.role==='EMPLOYEE').map(user=><option key={user.id} value={user.id}>{user.arabicName}</option>)}</select>}
       <select className="rounded-input border border-brand-border p-2.5" value={priority} onChange={event=>setPriority(event.target.value)}><option value="">كل الأولويات</option>{(Object.entries(priorityLabels) as [TaskPriority,string][]).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select>
       <select className="rounded-input border border-brand-border p-2.5" value={kind} onChange={event=>setKind(event.target.value)}><option value="">كل أنواع التكليف</option><option value="NORMAL">عادي</option><option value="SOCIAL_MEDIA">وسائل التواصل الاجتماعي</option></select>
-      <label className="text-sm">تاريخ الاستحقاق<input className="mt-1 block w-full rounded-input border border-brand-border p-2.5" type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD" value={date} onChange={event=>setDate(event.target.value)}/></label>
+      <label className="text-sm">تاريخ الاستحقاق<input className="mt-1 block w-full rounded-input border border-brand-border p-2.5" type="date" dir="ltr" value={date} onChange={event=>setDate(event.target.value)}/></label>
       <Button variant="outline" onClick={()=>{setQuery('');setEmployee('');setPriority('');setKind('');setDate('');setTab('ACTIVE')}}>مسح عوامل التصفية</Button>
     </div></Card>
     <p className="text-sm text-brand-charcoal">عدد النتائج: {rows.length}</p>

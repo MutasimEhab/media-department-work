@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { formatArabicDateTime } from '../../utils/dateFormatting';
 
 type AuditEvent = {
   id: string;
@@ -101,7 +102,7 @@ export const AuditLog: React.FC = () => {
     {loading && !events.length && <Card>جارٍ تحميل الأحداث…</Card>}
     {!loading && !error && !events.length && <Card>لا توجد أحداث مطابقة.</Card>}
     {events.map(event => <Card key={event.id}>
-      <div className="flex flex-wrap items-start justify-between gap-2"><div><b>{actionNames[event.action] ?? event.action}</b><p>{event.actorNameAr}{event.username ? ` · ${event.username}` : ''}</p><p className="text-sm">{event.entityType}{event.entityId ? ` · ${event.entityId}` : ''}</p></div><time dir="ltr" className="text-sm">{new Date(event.createdAt).toLocaleString('en-GB')}</time></div>
+      <div className="flex flex-wrap items-start justify-between gap-2"><div><b>{actionNames[event.action] ?? event.action}</b><p>{event.actorNameAr}{event.username ? ` · ${event.username}` : ''}</p><p className="text-sm">{event.entityType}{event.entityId ? ` · ${event.entityId}` : ''}</p></div><time className="text-sm">{formatArabicDateTime(event.createdAt)}</time></div>
       {Object.keys(event.metadata ?? {}).length > 0 && <details className="mt-2"><summary className="cursor-pointer text-sm">تفاصيل الحدث</summary><pre dir="ltr" className="mt-2 overflow-auto whitespace-pre-wrap rounded-lg bg-brand-lightGray p-3 text-xs">{JSON.stringify(event.metadata, null, 2)}</pre></details>}
     </Card>)}
     {nextOffset !== null && <Button disabled={loading} variant="outline" onClick={() => void loadMore()}>{loading ? 'جارٍ التحميل…' : 'تحميل المزيد'}</Button>}

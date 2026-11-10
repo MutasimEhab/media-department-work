@@ -24,6 +24,7 @@ export const WorkDateExceptions: React.FC<WorkDateExceptionsProps> = ({ mine = f
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [target, setTarget] = useState('');
   const [date, setDate] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
   const [reason, setReason] = useState('');
   const [grantOpen, setGrantOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -53,13 +54,14 @@ export const WorkDateExceptions: React.FC<WorkDateExceptionsProps> = ({ mine = f
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: target, workDate: date, reason }),
+        body: JSON.stringify({ userId: target, workDate: date, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : '', reason }),
       });
       const payload = await response.json() as { exception?: ExceptionRow; message?: string };
       if (!response.ok || !payload.exception) throw new Error(payload.message || 'تعذر حفظ الاستثناء.');
       setExceptions(current => [payload.exception!, ...current]);
       setGrantOpen(false);
       setDate('');
+      setExpiresAt('');
       setReason('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
@@ -86,9 +88,10 @@ export const WorkDateExceptions: React.FC<WorkDateExceptionsProps> = ({ mine = f
     }
   };
 
-  const active = exceptions.filter(exception => !exception.revokedAt);
+  const active = exceptions.filter(exception => !exception.revokedAt && (!exception.expiresAt || new Date(exception.expiresAt).getTime() > Date.now()));
   const visible = active;
   const mayManage = !mine && canAccess('manage_work_exceptions');
+  const minExpiryDateTime = new Date(Date.now() + 60_000 - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
   return <main className="space-y-4">
     <header className="flex flex-wrap items-center justify-between gap-3 app-page-heading">
@@ -107,7 +110,8 @@ export const WorkDateExceptions: React.FC<WorkDateExceptionsProps> = ({ mine = f
           {!mine && <p className="font-bold">{exception.employeeNameAr}</p>}
           <p><span className="font-semibold">التاريخ:</span> <time dir="ltr">{exception.dates[0]}</time></p>
           <p><span className="font-semibold">السبب:</span> {exception.reason}</p>
-          <p className="text-sm text-brand-charcoal/70">منح بواسطة {exception.granterNameAr} · <time dir="ltr">{new Date(exception.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Gaza' })}</time></p>
+          {exception.expiresAt && <p><span className="font-semibold">آخر موعد لإدخال العمل:</span> <time dir="ltr">{new Date(exception.expiresAt).toLocaleString('ar-PS', { timeZone: 'Asia/Gaza', dateStyle: 'medium', timeStyle: 'short', hour12: true, numberingSystem: 'latn' })}</time></p>}
+          <p className="text-sm text-brand-charcoal/70">منح بواسطة {exception.granterNameAr} · <time dir="ltr">{new Date(exception.createdAt).toLocaleString('ar-PS', { timeZone: 'Asia/Gaza', dateStyle: 'medium', timeStyle: 'short', hour12: true, numberingSystem: 'latn' })}</time></p>
         </div>
         {mayManage && <Button size="sm" variant="outline" disabled={busy} onClick={() => void revokeException(exception)}>إلغاء الاستثناء</Button>}
       </div>
@@ -122,14 +126,18 @@ export const WorkDateExceptions: React.FC<WorkDateExceptionsProps> = ({ mine = f
           </select>
         </label>
         <label className="block text-sm">تاريخ العمل الفائت
-          <input className="mt-1 min-h-11 w-full rounded-input border border-brand-border p-2" type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD" value={date} onChange={event => setDate(event.target.value)} />
+          <input className="mt-1 min-h-11 w-full rounded-input border border-brand-border p-2" type="date" dir="ltr" value={date} onChange={event => setDate(event.target.value)} />
+        </label>
+        <label className="block text-sm">آخر موعد لإدخال العمل السابق
+          <input className="mt-1 min-h-11 w-full rounded-input border border-brand-border p-2" type="datetime-local" dir="ltr" min={minExpiryDateTime} value={expiresAt} onChange={event => setExpiresAt(event.target.value)} />
+          <span className="mt-1 block text-xs text-brand-charcoal/70">يجب أن يكون الموعد مستقبلياً. سيصل إشعار للموظف بتاريخ العمل والموعد النهائي.</span>
         </label>
         <label className="block text-sm">سبب الاستثناء
           <textarea className="mt-1 w-full rounded-input border border-brand-border p-2" rows={3} maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} />
         </label>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <div className="flex gap-2">
-          <Button disabled={busy || !target || !date.trim() || !reason.trim()} onClick={() => void grantException()}>{busy ? 'جارٍ الحفظ…' : 'تأكيد المنح'}</Button>
+          <Button disabled={busy || !target || !date.trim() || !expiresAt || !reason.trim()} onClick={() => void grantException()}>{busy ? 'جارٍ الحفظ…' : 'تأكيد المنح'}</Button>
           <Button variant="outline" disabled={busy} onClick={() => setGrantOpen(false)}>إلغاء</Button>
         </div>
       </section>

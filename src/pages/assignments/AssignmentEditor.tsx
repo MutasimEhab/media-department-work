@@ -118,7 +118,7 @@ export const AssignmentEditor: React.FC = () => {
       </Card>
 
       <Card title={tx('2. الموعد والمستلمون','2. Deadline and recipients')}>
-        <div className="grid gap-4 sm:grid-cols-2"><TextField label={tx('تاريخ الاستحقاق','Due date')} type="text" inputMode="numeric" dir="ltr" placeholder="YYYY-MM-DD" min={minDate} value={deadline} onChange={event => setDeadline(event.target.value)} requiredIndicator/><TextField label="الوقت (مثال: ٠٥:٠٠ م)" type="text" inputMode="text" dir="rtl" placeholder="٠٥:٠٠ م" value={time} onChange={event => setTime(event.target.value)} requiredIndicator/></div>
+        <div className="grid gap-4 sm:grid-cols-2"><TextField label={tx('تاريخ الاستحقاق','Due date')} type="date" dir="ltr" min={minDate} value={deadline} onChange={event => setDeadline(event.target.value)} requiredIndicator/><TextField label="الوقت (مثال: 05:00 PM)" type="text" inputMode="text" dir="ltr" placeholder="05:00 PM" value={time} onChange={event => setTime(event.target.value)} requiredIndicator/></div>
         <p className="text-xs mt-2">{tx(`أقرب تاريخ متاح: ${minDate} (بعد اليوم التجريبي ${frozenDate}).`, `Earliest allowed date: ${minDate} (after demo today ${frozenDate}).`)}</p>
         <div className="mt-4"><MultiSelect label={tx('الموظفون المكلفون','Assigned employees')} options={recipientOptions} value={assignees} onChange={setAssignees} requiredIndicator/><div className="flex flex-wrap gap-2 mt-3">{assignees.map(userId=>{const user=users.find(candidate=>candidate.id===userId);return user?<span className="rounded-full bg-brand-lightGray px-3 py-1 text-sm" key={userId}>{ar?user.arabicName:user.englishName}</span>:null})}</div></div>
       </Card>
