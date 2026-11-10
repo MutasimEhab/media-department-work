@@ -6,6 +6,7 @@ import {
 } from '../data/mockData';
 import { translations, Language } from '../i18n/translations';
 import { AppPermission, DEFAULT_ROLE_PERMISSIONS, roleHasPermission, RolePermissionOverrides } from '../auth/permissions';
+import { ToastItem, ToastType } from '../components/ui/Toast';
 
 export type DisplayTheme = 'light' | 'dark';
 
@@ -21,6 +22,9 @@ interface AppContextType {
   isAuthLoading: boolean;
   welcomeGreetingOpen: boolean;
   dismissWelcomeGreeting: () => void;
+  notify: (message: string, type?: ToastType) => void;
+  dismissToast: (id: string) => void;
+  toasts: ToastItem[];
   signOut: () => void;
   users: User[];
   tasks: Task[];
@@ -95,6 +99,7 @@ function mapBackendUser(user: BackendUser): User {
     email: user.email,
     mobile: user.mobile,
     isActive: user.isActive,
+    departmentId: user.departmentId,
     departmentAr: user.departmentAr,
     departmentEn: user.departmentAr,
     preferredLanguage: 'ar',
@@ -120,6 +125,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [welcomeGreetingOpen, setWelcomeGreetingOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const dismissToast = useCallback((id: string) => setToasts(previous => previous.filter(item => item.id !== id)), []);
+  const notify = useCallback((message: string, type: ToastType = 'success') => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts(previous => [...previous.slice(-3), { id, type, message }]);
+    window.setTimeout(() => setToasts(previous => previous.filter(item => item.id !== id)), 5000);
+  }, []);
   const dismissWelcomeGreeting = useCallback(() => setWelcomeGreetingOpen(false), []);
   // Keep a harmless fallback for pages such as sign-in; AppShell blocks every internal route until authentication.
   const [currentUser, setCurrentUser] = useState<User>(() => {
@@ -347,11 +359,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const response = await fetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH', credentials: 'include' });
         if (!response.ok) throw new Error('notification update failed');
       } catch {
-        window.alert('تعذر حفظ حالة الإشعار.');
+        notify('تعذر حفظ حالة الإشعار.', 'error');
         return;
       }
     }
     setNotifications(prev => prev.map(item => item.id === id ? { ...item, isRead: true } : item));
+    notify('تم تحديث حالة الإشعار.', 'success');
   };
 
   const markAllNotificationsAsRead = async () => {
@@ -359,10 +372,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const response = await fetch('/api/notifications/read-all', { method: 'POST', credentials: 'include' });
       if (!response.ok) throw new Error('notification update failed');
     } catch {
-      window.alert('تعذر حفظ حالة الإشعارات.');
+      notify('تعذر حفظ حالة الإشعارات.', 'error');
       return;
     }
     setNotifications(prev => prev.map(item => item.userId === currentUser.id ? { ...item, isRead: true } : item));
+    notify('تم تعليم الإشعارات كمقروءة.', 'success');
   };
 
   const acknowledgeCircular = async (circularId: string, userId: string) => {
@@ -371,16 +385,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'PATCH', credentials: 'include',
       });
       const payload = await response.json() as { acknowledgedAt?: string; message?: string };
-      if (!response.ok) return { ok: false, message: payload.message || 'تعذر حفظ إقرار القراءة.' };
+      if (!response.ok) {
+        const message = payload.message || 'تعذر حفظ إقرار القراءة.';
+        notify(message, 'error');
+        return { ok: false, message };
+      }
       setCirculars(previous => previous.map(circular => circular.id !== circularId ? circular : {
         ...circular,
         recipients: circular.recipients.map(recipient => recipient.userId === userId
           ? { ...recipient, hasAcknowledged: true, acknowledgedAt: payload.acknowledgedAt }
           : recipient),
       }));
+      notify('تم تسجيل إقرار قراءة التعميم.', 'success');
       return { ok: true };
     } catch {
-      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحفظ إقرار القراءة.' };
+      const message = 'تعذر الاتصال بالخادم؛ لم يُحفظ إقرار القراءة.';
+      notify(message, 'error');
+      return { ok: false, message };
     }
   };
 
@@ -400,11 +421,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       const payload = await response.json() as { workLog?: WorkLog; message?: string };
-      if (!response.ok || !payload.workLog) return { ok: false, message: payload.message || 'تعذر حفظ سجل العمل.' };
+      if (!response.ok || !payload.workLog) {
+        const message = payload.message || 'تعذر حفظ سجل العمل.';
+        notify(message, 'error');
+        return { ok: false, message };
+      }
       setWorkLogs(previous => [payload.workLog!, ...previous.filter(log => log.id !== payload.workLog!.id)]);
+      notify('تم حفظ سجل العمل بنجاح.', 'success');
       return { ok: true };
     } catch {
-      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحفظ سجل العمل.' };
+      const message = 'تعذر الاتصال بالخادم؛ لم يُحفظ سجل العمل.';
+      notify(message, 'error');
+      return { ok: false, message };
     }
   };
 
@@ -422,11 +450,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       const payload = await response.json() as { workLog?: WorkLog; message?: string };
-      if (!response.ok || !payload.workLog) return { ok: false, message: payload.message || 'تعذر تعديل السجل.' };
+      if (!response.ok || !payload.workLog) {
+        const message = payload.message || 'تعذر تعديل السجل.';
+        notify(message, 'error');
+        return { ok: false, message };
+      }
       setWorkLogs(previous => previous.map(log => log.id === id ? payload.workLog! : log));
+      notify('تم تعديل سجل العمل.', 'success');
       return { ok: true };
     } catch {
-      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُعدّل السجل.' };
+      const message = 'تعذر الاتصال بالخادم؛ لم يُعدّل السجل.';
+      notify(message, 'error');
+      return { ok: false, message };
     }
   };
 
@@ -436,11 +471,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'DELETE', credentials: 'include',
       });
       const payload = await response.json() as { message?: string };
-      if (!response.ok) return { ok: false, message: payload.message || 'تعذر حذف السجل.' };
+      if (!response.ok) {
+        const message = payload.message || 'تعذر حذف السجل.';
+        notify(message, 'error');
+        return { ok: false, message };
+      }
       setWorkLogs(previous => previous.filter(log => log.id !== id));
+      notify('تم حذف سجل العمل نهائياً.', 'success');
       return { ok: true };
     } catch {
-      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحذف السجل.' };
+      const message = 'تعذر الاتصال بالخادم؛ لم يُحذف السجل.';
+      notify(message, 'error');
+      return { ok: false, message };
     }
   };
 
@@ -474,13 +516,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       const payload = await response.json() as { task?: Task; message?: string };
-      if (!response.ok || !payload.task) return { ok: false, message: payload.message || 'تعذر حفظ التكليف.' };
+      if (!response.ok || !payload.task) {
+        const message = payload.message || 'تعذر حفظ التكليف.';
+        notify(message, 'error');
+        return { ok: false, message };
+      }
       setTasks(previous => previous.some(existing => existing.id === payload.task!.id)
         ? previous.map(existing => existing.id === payload.task!.id ? payload.task! : existing)
         : [payload.task!, ...previous]);
+      notify(task.isDraft ? 'تم حفظ التكليف كمسودة.' : 'تم إرسال التكليف وإشعار الموظفين.', 'success');
       return { ok: true, task: payload.task };
     } catch {
-      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحفظ التكليف.' };
+      const message = 'تعذر الاتصال بالخادم؛ لم يُحفظ التكليف.';
+      notify(message, 'error');
+      return { ok: false, message };
     }
   };
   const saveTask = (task: Task) => persistTask({ ...task, isDraft: true });
@@ -517,12 +566,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }),
         });
         const payload = await response.json() as { message?: string };
-        if (!response.ok) return { ok: false, message: payload.message || 'تعذر حفظ تحديث التكليف.' };
+        if (!response.ok) {
+          const message = payload.message || 'تعذر حفظ تحديث التكليف.';
+          notify(message, 'error');
+          return { ok: false, message };
+        }
       } catch {
-        return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم يُحفظ تحديث التكليف.' };
+        const message = 'تعذر الاتصال بالخادم؛ لم يُحفظ تحديث التكليف.';
+        notify(message, 'error');
+        return { ok: false, message };
       }
     }
     setTasks(previous => previous.map(task => task.id === taskId ? updated : task));
+    notify('تم تحديث حالة التكليف.', 'success');
     return { ok: true };
   };
   const updateProjects = async (update: (current: Project[]) => Project[]) => {
@@ -548,16 +604,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const payload = await response.json() as { project?: Project; message?: string };
       if (!response.ok || (created && !payload.project)) {
         const message = payload.message || 'تعذر حفظ المشروع.';
-        window.alert(message);
+        notify(message, 'error');
         return { ok: false, message };
       }
       setProjects(created
         ? [payload.project!, ...projects]
         : next);
+      notify(created ? 'تم إنشاء المشروع.' : 'تم تحديث المشروع.', 'success');
       return { ok: true };
     } catch {
       const message = 'تعذر الاتصال بالخادم؛ لم يُحفظ المشروع.';
-      window.alert(message);
+      notify(message, 'error');
       return { ok: false, message };
     }
   };
@@ -577,7 +634,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const payload = await response.json() as { circular?: Circular; message?: string };
       if (!response.ok || !payload.circular) {
         const message = payload.message || 'تعذر حفظ التعميم.';
-        window.alert(message);
+        notify(message, 'error');
         return { ok: false, message };
       }
       setCirculars(previous => [payload.circular!, ...previous.filter(item => item.id !== payload.circular!.id)]);
@@ -595,10 +652,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         } catch { /* the published circular is already saved; notifications reload at next sign-in */ }
       }
+      notify(publish ? 'تم نشر التعميم وإرسال إشعار للمستلمين.' : 'تم حفظ التعميم كمسودة.', 'success');
       return { ok: true, circular: payload.circular };
     } catch {
       const message = 'تعذر الاتصال بالخادم؛ لم يُحفظ التعميم.';
-      window.alert(message);
+      notify(message, 'error');
       return { ok: false, message };
     }
   };
@@ -608,16 +666,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST', credentials: 'include',
       });
       const payload = await response.json() as { reminderCount?: number; message?: string };
-      if (!response.ok || payload.reminderCount === undefined) return { ok: false, message: payload.message || 'تعذر حفظ محاولة التذكير.' };
+      if (!response.ok || payload.reminderCount === undefined) {
+        const message = payload.message || 'تعذر حفظ محاولة التذكير.';
+        notify(message, 'error');
+        return { ok: false, message };
+      }
       setCirculars(previous => previous.map(circular => circular.id !== circularId ? circular : {
         ...circular,
         recipients: circular.recipients.map(recipient => recipient.userId === userId
           ? { ...recipient, reminderCount: payload.reminderCount }
           : recipient),
       }));
+      notify('تم تسجيل التذكير.', 'success');
       return { ok: true, reminderCount: payload.reminderCount };
     } catch {
-      return { ok: false, message: 'تعذر الاتصال بالخادم؛ لم تُحفظ محاولة التذكير.' };
+      const message = 'تعذر الاتصال بالخادم؛ لم تُحفظ محاولة التذكير.';
+      notify(message, 'error');
+      return { ok: false, message };
     }
   };
   const updateUser = (user: User) => {
@@ -644,9 +709,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const payload = await response.json() as { message?: string };
       if (!response.ok) throw new Error(payload.message || 'تعذر حفظ الصلاحية.');
       setRolePermissions(previous => ({ ...previous, [role]: nextPermissions }));
+      notify('تم تحديث صلاحيات نوع الحساب.', 'success');
       return true;
     } catch (cause) {
-      window.alert(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم؛ لم تُحفظ الصلاحية.');
+      notify(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم؛ لم تُحفظ الصلاحية.', 'error');
       return false;
     }
   };
@@ -665,12 +731,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const payload = await response.json() as { message?: string };
       if (!response.ok) throw new Error(payload.message || 'تعذر حفظ الاستثناء.');
       await refreshExceptions();
-    }).catch(cause => window.alert(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.'));
+      notify('تم تسجيل الاستثناء وإشعار الموظف.', 'success');
+    }).catch(cause => notify(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.', 'error'));
   };
   const revokeException = (id: string) => {
     void fetch(`/api/work-date-exceptions/${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'include' })
-      .then(async response => { const payload = await response.json() as { message?: string }; if (!response.ok) throw new Error(payload.message || 'تعذر إلغاء الاستثناء.'); await refreshExceptions(); })
-      .catch(cause => window.alert(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.'));
+      .then(async response => { const payload = await response.json() as { message?: string }; if (!response.ok) throw new Error(payload.message || 'تعذر إلغاء الاستثناء.'); await refreshExceptions(); notify('تم إلغاء الاستثناء.', 'success'); })
+      .catch(cause => notify(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.', 'error'));
   };
   const t = translations[language];
 
@@ -688,6 +755,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthLoading,
         welcomeGreetingOpen,
         dismissWelcomeGreeting,
+        notify,
+        dismissToast,
+        toasts,
         signOut,
         users,
         tasks,

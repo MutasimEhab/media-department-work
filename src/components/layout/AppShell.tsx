@@ -7,9 +7,10 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { EnglishDigits } from '../ui/EnglishDigits';
 import { WelcomeGreeting } from './WelcomeGreeting';
+import { Toast } from '../ui/Toast';
 
 export const AppShell: React.FC = () => {
-  const { isAuthenticated, isAuthLoading, theme } = useApp();
+  const { isAuthenticated, isAuthLoading, theme, toasts, dismissToast } = useApp();
   const location = useLocation();
   if (isAuthLoading) return <main role="status" className="min-h-screen grid place-items-center bg-brand-lightGray text-brand-charcoal">جارٍ التحقق من جلسة الدخول…</main>;
   if (!isAuthenticated) return <Navigate to="/auth/login" replace state={{ from: location.pathname }} />;
@@ -19,6 +20,7 @@ export const AppShell: React.FC = () => {
       <DemoBanner />
       <Topbar />
       <WelcomeGreeting />
+      <Toast toasts={toasts} onDismiss={dismissToast} />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <div className="min-w-0 flex-1 overflow-y-auto">

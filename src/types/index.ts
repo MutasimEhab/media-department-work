@@ -16,6 +16,7 @@ export interface User {
   isActive: boolean;
   departmentAr: string;
   departmentEn: string;
+  departmentId?: string;
   mobile?: string;
   preferredLanguage?: 'ar' | 'en';
   lastSignIn?: string;
