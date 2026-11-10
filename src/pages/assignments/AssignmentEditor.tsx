@@ -8,8 +8,23 @@ import { Textarea } from '../../components/ui/Textarea';
 import { useApp } from '../../context/AppContext';
 import { Task, TaskPriority, TaskType } from '../../types';
 
-const timeInput = (deadline?: string) => deadline?.match(/\d{1,2}:\d{2}\s?(?:AM|PM)/i)?.[0]?.replace(/\s+/g, ' ').replace(/AM/i,'ص').replace(/PM/i,'م') || '05:00 م';
-const storedTime = (time: string) => time.trim().replace(/\s*ص$/,' AM').replace(/\s*م$/,' PM').trim().toUpperCase();
+const timeInput = (deadline?: string) => {
+  const match = deadline?.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return '17:00';
+  let hour = Number(match[1]) % 12;
+  if (match[3]!.toUpperCase() === 'PM') hour += 12;
+  return `${String(hour).padStart(2, '0')}:${match[2]}`;
+};
+const storedTime = (time: string) => {
+  const [rawHour, minute] = time.split(':');
+  const hour = Number(rawHour);
+  return `${String(hour % 12 || 12).padStart(2, '0')}:${minute} ${hour >= 12 ? 'PM' : 'AM'}`;
+};
+const tomorrowInGaza = (date: string) => {
+  const [year, month, day] = date.split('-').map(Number);
+  const tomorrow = new Date(Date.UTC(year!, month! - 1, day! + 1));
+  return tomorrow.toISOString().slice(0, 10);
+};
 
 export const AssignmentEditor: React.FC = () => {
   const { language, currentUser, users, tasks, saveTask, sendTask, frozenDate } = useApp();
@@ -22,7 +37,7 @@ export const AssignmentEditor: React.FC = () => {
   const [descriptionAr, setDescriptionAr] = useState(base?.descriptionAr || '');
   const [priority, setPriority] = useState<TaskPriority>(base?.priority || 'MEDIUM');
   const [type, setType] = useState<TaskType>(base?.type || 'NORMAL');
-  const [deadline, setDeadline] = useState(base?.deadline.split(' ')[0] || '2026-11-05');
+  const [deadline, setDeadline] = useState(base?.deadline.split(' ')[0] || tomorrowInGaza(frozenDate));
   const [time, setTime] = useState(timeInput(base?.deadline));
   const [assignees, setAssignees] = useState<string[]>(base?.recipients.map(recipient => recipient.userId) || []);
   const [referenceUrl, setReferenceUrl] = useState(base?.referenceUrl || '');
@@ -32,13 +47,10 @@ export const AssignmentEditor: React.FC = () => {
   const [error, setError] = useState('');
   const [serverError, setServerError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [simulateError, setSimulateError] = useState(false);
   const sentOnce = useRef(false);
   const activeUsers = users.filter(user => user.role === 'EMPLOYEE' && user.isActive);
   const recipientOptions = activeUsers.map(user => ({ value: user.id, label: `${ar ? user.arabicName : user.englishName} · ${ar ? user.jobTitleAr : user.jobTitleEn}` }));
-  const tomorrow = new Date(`${frozenDate}T00:00:00`);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().slice(0, 10);
+  const minDate = tomorrowInGaza(frozenDate);
   const urlIsValid = !referenceUrl || /^https:\/\/drive\.google\.com\//.test(referenceUrl.trim());
 
   const makeTask = (isDraft: boolean): Task => ({
@@ -77,7 +89,7 @@ export const AssignmentEditor: React.FC = () => {
     if (!titleAr.trim()) { setError('title'); return false; }
     if (send && !descriptionAr.trim()) { setError('description'); return false; }
     if (deadline < minDate) { setError('date'); return false; }
-    if (!/^((0?[1-9]|1[0-2]):[0-5]\d)\s?(ص|م)$/.test(time.trim())) { setError('time'); return false; }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time.trim())) { setError('time'); return false; }
     if (!urlIsValid) { setError('url'); return false; }
     if (send && !assignees.length) { setError('assignees'); return false; }
     return true;
@@ -90,8 +102,6 @@ export const AssignmentEditor: React.FC = () => {
       : tx('حفظ محتوى التكليف كمسودة؟', 'Save assignment content as a draft?'));
     if (!confirmed) return;
     setBusy(true);
-    await new Promise(resolve => window.setTimeout(resolve, 500));
-    if (simulateError) { setBusy(false); setError('network'); return; }
     const task = makeTask(!send);
     setServerError('');
     const result = send ? await sendTask(task) : await saveTask(task);
@@ -118,7 +128,7 @@ export const AssignmentEditor: React.FC = () => {
       </Card>
 
       <Card title={tx('2. الموعد والمستلمون','2. Deadline and recipients')}>
-        <div className="grid gap-4 sm:grid-cols-2"><TextField label={tx('تاريخ الاستحقاق','Due date')} type="date" dir="ltr" min={minDate} value={deadline} onChange={event => setDeadline(event.target.value)} requiredIndicator/><TextField label="الوقت (مثال: 05:00 PM)" type="text" inputMode="text" dir="ltr" placeholder="05:00 PM" value={time} onChange={event => setTime(event.target.value)} requiredIndicator/></div>
+        <div className="grid gap-4 sm:grid-cols-2"><TextField label={tx('تاريخ الاستحقاق','Due date')} type="date" dir="ltr" min={minDate} value={deadline} onChange={event => setDeadline(event.target.value)} requiredIndicator/><TextField label="وقت الاستحقاق" type="time" dir="ltr" value={time} onChange={event => setTime(event.target.value)} requiredIndicator/></div>
         <p className="text-xs mt-2">{tx(`أقرب تاريخ متاح: ${minDate} (بعد اليوم التجريبي ${frozenDate}).`, `Earliest allowed date: ${minDate} (after demo today ${frozenDate}).`)}</p>
         <div className="mt-4"><MultiSelect label={tx('الموظفون المكلفون','Assigned employees')} options={recipientOptions} value={assignees} onChange={setAssignees} requiredIndicator/><div className="flex flex-wrap gap-2 mt-3">{assignees.map(userId=>{const user=users.find(candidate=>candidate.id===userId);return user?<span className="rounded-full bg-brand-lightGray px-3 py-1 text-sm" key={userId}>{ar?user.arabicName:user.englishName}</span>:null})}</div></div>
       </Card>
@@ -132,8 +142,7 @@ export const AssignmentEditor: React.FC = () => {
         <p className="text-sm mt-2">{tx('الإشعارات الداخلية مفعّلة دائماً. البريد وSMS لا يرسلان فعلياً.','Internal notifications are always on. Email and SMS are not actually sent.')}</p>
       </Card>
 
-      <Card title={tx('معاينة الحالة','Preview state')}><label className="flex gap-2"><input type="checkbox" checked={simulateError} onChange={event=>setSimulateError(event.target.checked)}/>{tx('محاكاة خطأ اتصال عند الحفظ','Simulate a network error on save')}</label></Card>
-      {error&&<p role="alert" className="p-3 border-s-4 border-brand-plum">{({title:'أدخل عنوان التكليف بالعربية.',description:'أدخل وصف التكليف بالعربية قبل الإرسال.',date:'اختر موعدًا مستقبليًا بعد تاريخ اليوم التجريبي.',time:'أدخل الوقت بصيغة ١٢ ساعة مثل ٠٥:٠٠ م.',url:'يجب أن يبدأ الرابط بـ https://drive.google.com/.',assignees:'اختر موظفًا واحدًا على الأقل.',network:'تعذر الاتصال التجريبي. احتفظنا بالمحتوى؛ أعد المحاولة.'} as Record<string,string>)[error]}</p>}
+      {error&&<p role="alert" className="p-3 border-s-4 border-brand-plum">{({title:'أدخل عنوان التكليف بالعربية.',description:'أدخل وصف التكليف بالعربية قبل الإرسال.',date:'اختر موعدًا مستقبليًا بعد تاريخ اليوم.',time:'اختر وقتاً صحيحاً للاستحقاق.',url:'يجب أن يبدأ الرابط بـ https://drive.google.com/.',assignees:'اختر موظفًا واحدًا على الأقل.'} as Record<string,string>)[error]}</p>}
       {serverError&&<p role="alert" className="p-3 border-s-4 border-red-600">{serverError}</p>}
       <div className="flex flex-wrap gap-3"><Button type="button" variant="outline" isLoading={busy} disabled={busy} onClick={()=>submit(false)}>{tx('حفظ كمسودة','Save draft')}</Button><Button type="button" isLoading={busy} disabled={busy} onClick={()=>submit(true)}>{tx('إرسال التكليف','Send assignment')}</Button><Button type="button" variant="ghost" onClick={()=>navigate('/app/assignments')}>{tx('إلغاء','Cancel')}</Button></div>
     </form>

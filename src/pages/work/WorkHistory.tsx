@@ -8,6 +8,7 @@ import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { WorkLog } from '../../types';
 import { downloadCsv } from '../../utils/downloadCsv';
 import { formatArabicWorkDate } from '../../utils/dateFormatting';
+import { downloadWorkReportPdf } from '../../utils/workReportPdf';
 
 export const WorkHistory: React.FC = () => {
   const { language, currentUser, workLogs, tasks, projects, updateWorkLog, deleteWorkLog } = useApp();
@@ -22,6 +23,7 @@ export const WorkHistory: React.FC = () => {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<WorkLog>>({});
   const [busy, setBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEscapeKey(Boolean(selected), () => { setSelected(null); setEditing(false); });
@@ -38,6 +40,21 @@ export const WorkHistory: React.FC = () => {
   const exportCsv = () => downloadCsv('سجل-أعمالي.csv',
     ['التاريخ', 'الوقت', 'التفاصيل', 'المنطقة', 'مكان العمل'],
     rows.map(row => [row.date, row.time, row.activityAr, row.area || '', row.location === 'OFFICE' ? 'مكتبي' : 'ميداني']));
+
+  const exportPdf = async () => {
+    setPdfBusy(true);
+    setError('');
+    try {
+      await downloadWorkReportPdf(rows, [{
+        id: currentUser.id, arabicName: currentUser.arabicName,
+        employeeNumber: currentUser.employeeNumber, jobTitleAr: currentUser.jobTitleAr,
+      }], fromDate, toDate, currentUser.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر إنشاء ملف PDF.');
+    } finally {
+      setPdfBusy(false);
+    }
+  };
 
   const startEditing = (log: WorkLog) => {
     setSelected(log.id);
@@ -95,7 +112,7 @@ export const WorkHistory: React.FC = () => {
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="me-auto text-xs text-brand-charcoal/70">{tx('السجلات المطابقة', 'Matching records')}: {rows.length}</span>
         <Button size="sm" variant="secondary" onClick={() => { setFromDate(''); setToDate(''); setQuery(''); setMode(''); setArea(''); }}>{tx('مسح الفلتر', 'Clear filters')}</Button>
-        <Button size="sm" variant="outline" onClick={() => window.print()}>{tx('تصدير PDF / طباعة', 'Export PDF / Print')}</Button>
+        <Button size="sm" variant="outline" disabled={!rows.length || pdfBusy} isLoading={pdfBusy} onClick={() => void exportPdf()}>{tx('تنزيل PDF بالترويسة', 'Download letterhead PDF')}</Button>
         <Button size="sm" variant="outline" onClick={exportCsv}>{tx('تنزيل CSV', 'Download CSV')}</Button>
         <Link to="/app/work/new"><Button size="sm">{tx('إضافة عمل', 'Add work')}</Button></Link>
       </div>

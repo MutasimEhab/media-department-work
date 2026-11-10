@@ -5,6 +5,7 @@ import { Table } from '../../components/ui/Table';
 import { useApp } from '../../context/AppContext';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { User, WorkLog } from '../../types';
+import { downloadWorkReportPdf } from '../../utils/workReportPdf';
 
 interface DatabaseUsersResponse { users?: User[]; message?: string }
 interface WorkLogsResponse { workLogs?: WorkLog[]; message?: string }
@@ -21,6 +22,7 @@ export const ManagementWorkLogs: React.FC = () => {
   const [mode, setMode] = useState('');
   const [detail, setDetail] = useState<WorkLog | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [error, setError] = useState('');
   useEscapeKey(Boolean(detail), () => setDetail(null));
 
@@ -57,6 +59,27 @@ export const ManagementWorkLogs: React.FC = () => {
   const todayEmployees = new Set(todayLogs.map(log => log.userId));
   const nonSubmitters = users.filter(user => user.isActive && !todayEmployees.has(user.id));
 
+  const exportPdf = async () => {
+    setPdfBusy(true);
+    setError('');
+    try {
+      let rangeFrom = date || (month ? `${month}-01` : '');
+      let rangeTo = date;
+      if (!date && month) {
+        const [year, monthNumber] = month.split('-').map(Number);
+        rangeTo = new Date(Date.UTC(year!, monthNumber!, 0)).toISOString().slice(0, 10);
+      }
+      await downloadWorkReportPdf(rows, users.map(user => ({
+        id: user.id, arabicName: user.arabicName,
+        employeeNumber: user.employeeNumber, jobTitleAr: user.jobTitleAr,
+      })), rangeFrom, rangeTo, employee);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر إنشاء ملف PDF.');
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   const columns = [
     { key: 'person', header: tx('الموظف', 'Employee'), render: (log: WorkLog) => <span>{log.userNameAr} · {users.find(user => user.id === log.userId)?.jobTitleAr || ''}</span> },
     { key: 'date', header: tx('التاريخ', 'Date') },
@@ -69,7 +92,7 @@ export const ManagementWorkLogs: React.FC = () => {
 
   return <main className="space-y-5">
     <header className="app-page-heading"><h1 className="mt-2 text-2xl font-bold">{tx('سجلات عمل الموظفين', 'Employee work logs')}</h1><p>{tx('سجلات الموظفين للقراءة فقط؛ يحتفظ كل موظف بحق تعديل سجلاته وحذفها.', 'Employee logs are read-only for management. Each employee manages their own records.')}</p></header>
-    <div className="grid gap-3 sm:grid-cols-3"><Card><b>{tx('مسجلو اليوم', 'Today’s active loggers')}</b><p className="text-2xl">{todayEmployees.size}</p></Card><Card><b>{tx('لم يسجلوا اليوم', 'No submission today')}</b><p>{nonSubmitters.map(user => user.arabicName).join('، ') || tx('سجل الجميع.', 'Everyone has submitted.')}</p></Card><Card><Button variant="outline" onClick={() => window.print()}>{tx('طباعة الكشف', 'Print report')}</Button></Card></div>
+    <div className="grid gap-3 sm:grid-cols-3"><Card><b>{tx('مسجلو اليوم', 'Today’s active loggers')}</b><p className="text-2xl">{todayEmployees.size}</p></Card><Card><b>{tx('لم يسجلوا اليوم', 'No submission today')}</b><p>{nonSubmitters.map(user => user.arabicName).join('، ') || tx('سجل الجميع.', 'Everyone has submitted.')}</p></Card><Card><Button variant="outline" disabled={!rows.length || pdfBusy} isLoading={pdfBusy} onClick={() => void exportPdf()}>{tx('تنزيل PDF بالترويسة', 'Download letterhead PDF')}</Button></Card></div>
     <Card><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <input className="rounded-input border border-brand-border p-2" placeholder={tx('بحث بالموظف أو التفاصيل أو المنطقة', 'Search employee, details or area')} value={query} onChange={event => setQuery(event.target.value)} />
       <select className="rounded-input border border-brand-border p-2" value={employee} onChange={event => setEmployee(event.target.value)}><option value="">{tx('كل الموظفين', 'All employees')}</option>{users.map(user => <option key={user.id} value={user.id}>{user.arabicName}</option>)}</select>
