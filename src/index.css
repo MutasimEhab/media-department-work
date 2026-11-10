@@ -13,9 +13,9 @@
 }
 
 .welcome-backdrop {
-  background: rgba(13, 8, 16, .92);
-  backdrop-filter: blur(20px) saturate(.65);
-  -webkit-backdrop-filter: blur(20px) saturate(.65);
+  background: rgba(13, 8, 16, .48);
+  backdrop-filter: blur(7px) saturate(.82);
+  -webkit-backdrop-filter: blur(7px) saturate(.82);
 }
 
 .auth-system-title {
@@ -347,8 +347,11 @@ h1, h2, h3 {
 
 /* Match the supplied split login composition while retaining the existing flows. */
 .auth-page > div {
+  width: 100%;
+  min-height: min(720px, calc(100vh - 64px));
+  margin-block: auto;
   overflow: hidden;
-  max-width: 960px;
+  max-width: 1040px;
   gap: 0;
   border-radius: 24px;
   background: #fff;
@@ -360,15 +363,19 @@ h1, h2, h3 {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 1.25rem;
+  gap: 1rem;
   padding: clamp(28px, 5vw, 56px);
   color: #fff;
-  background: linear-gradient(145deg, #871281, #c80893);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(255,255,255,.14), transparent 28%),
+    radial-gradient(circle at 90% 84%, rgba(255,255,255,.10), transparent 32%),
+    linear-gradient(145deg, #74106f, #a90783 60%, #c80893);
 }
 .auth-page > div > section:first-child .text-brand-plum { color: #fff !important; }
 .auth-page > div > section:first-child h1 { color: #fff; }
 .auth-page > div > section:first-child .auth-system-title { margin-bottom: .25rem; }
 .auth-page > div > section:first-child > img { border-radius: 20px; background: #fff; padding: 10px; }
+.auth-page > div > section:first-child > img { box-shadow: 0 12px 32px rgba(36, 7, 35, .24); }
 .auth-page > div > section:last-child {
   grid-column: 2;
   grid-row: 1;
@@ -380,7 +387,7 @@ h1, h2, h3 {
 }
 .auth-page input:not([type="checkbox"]):not([type="radio"]) { background-color: #fff; border-color: #ead9e8; }
 @media (max-width: 1023px) {
-  .auth-page > div { border-radius: 20px; }
+  .auth-page > div { min-height: unset; border-radius: 20px; }
   .auth-page > div > section:first-child { grid-column: 1; grid-row: 1; }
   .auth-page > div > section:last-child { grid-column: 1; grid-row: 2; }
 }

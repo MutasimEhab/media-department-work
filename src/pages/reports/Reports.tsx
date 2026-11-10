@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
+import { downloadWorkReportPdf, ReportEmployee } from '../../utils/workReportPdf';
 
 type ReportLog = { id: string; userId: string; userNameAr: string; date: string; time: string; activityAr: string; location: 'OFFICE' | 'FIELD'; area: string };
 type AssignmentSummary = Record<string, { total: number; onTime: number }>;
 type ReportData = { workLogs: ReportLog[]; summary: { workLogCount: number; officeCount: number; fieldCount: number; assignments: AssignmentSummary } };
-type Employee = { id: string; arabicName: string };
+type Employee = ReportEmployee;
 
 const STATUS_LABELS: Record<string, string> = { assigned: 'مسند', in_progress: 'قيد التنفيذ', submitted: 'مُسلّم', approved: 'معتمد', returned: 'مُعاد للتعديل' };
 
@@ -17,6 +18,7 @@ export const Reports: React.FC<{ department?: boolean }> = ({ department = false
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [data, setData] = useState<ReportData | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [error, setError] = useState('');
   const allowed = department ? canAccess('view_department_reports') : canAccess('view_own_report');
 
@@ -56,9 +58,29 @@ export const Reports: React.FC<{ department?: boolean }> = ({ department = false
     const link = document.createElement('a'); link.href = url; link.download = `تقرير-الأعمال-${month}.csv`; link.click(); URL.revokeObjectURL(url);
   };
 
+  const exportPdf = async () => {
+    if (!data) return;
+    setPdfBusy(true);
+    setError('');
+    try {
+      const [year, monthNumber] = month.split('-').map(Number);
+      const from = `${month}-01`;
+      const to = new Date(Date.UTC(year!, monthNumber!, 0)).toISOString().slice(0, 10);
+      const reportEmployees = department ? employees : [{
+        id: currentUser.id, arabicName: currentUser.arabicName,
+        employeeNumber: currentUser.employeeNumber, jobTitleAr: currentUser.jobTitleAr,
+      }];
+      await downloadWorkReportPdf(data.workLogs, reportEmployees, from, to, person || (!department ? currentUser.id : ''));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر إنشاء ملف PDF.');
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   return <main className="space-y-5 printable-report">
     <header className="app-page-heading"><span className="text-xs font-subheading text-brand-plum">تقارير محفوظة في قاعدة البيانات</span><h1 className="mt-2 text-2xl font-bold">{department ? 'تقارير الدائرة' : 'تقاريري الشهرية'}</h1><p>{department ? 'عرض فعلي لسجلات الموظفين والتكليفات ضمن نطاق الصلاحية.' : `سجلات العمل والتكليفات المسندة إلى ${currentUser.arabicName}.`}</p></header>
-    <Card><div className="no-print flex flex-wrap items-end gap-3"><label className="text-sm">الشهر<input type="month" dir="ltr" className="mt-1 block min-h-11 rounded-input border border-brand-border bg-transparent px-3" value={month} onChange={event => setMonth(event.target.value)} /></label>{department && <label className="text-sm">الموظف<select className="mt-1 block min-h-11 rounded-input border border-brand-border bg-transparent px-3" value={person} onChange={event => setPerson(event.target.value)}><option value="">جميع الموظفين</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.arabicName}</option>)}</select></label>}<Button variant="outline" disabled={busy || !data} onClick={exportCsv}>تنزيل CSV</Button><Button variant="outline" onClick={() => window.print()}>تصدير PDF / طباعة</Button></div></Card>
+    <Card><div className="no-print flex flex-wrap items-end gap-3"><label className="text-sm">الشهر<input type="month" dir="ltr" className="mt-1 block min-h-11 rounded-input border border-brand-border bg-transparent px-3" value={month} onChange={event => setMonth(event.target.value)} /></label>{department && <label className="text-sm">الموظف<select className="mt-1 block min-h-11 rounded-input border border-brand-border bg-transparent px-3" value={person} onChange={event => setPerson(event.target.value)}><option value="">جميع الموظفين</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.arabicName}</option>)}</select></label>}<Button variant="outline" disabled={busy || !data} onClick={exportCsv}>تنزيل CSV</Button><Button variant="outline" disabled={busy || pdfBusy || !data || !rows.length} isLoading={pdfBusy} onClick={() => void exportPdf()}>تنزيل PDF بالترويسة</Button></div></Card>
     {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {busy && <Card>جارٍ تحميل بيانات التقرير المحفوظة…</Card>}
     {!busy && data && <>

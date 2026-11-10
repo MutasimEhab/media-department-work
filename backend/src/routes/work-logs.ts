@@ -92,6 +92,56 @@ router.get('/department', async (request: AuthenticatedRequest, response) => {
   }
 });
 
+router.get('/department/today', async (request: AuthenticatedRequest, response) => {
+  const actor = request.authUser!;
+  const mayMonitor = actor.roleCode === 'system_admin'
+    || request.permissions?.includes('view_department_work_logs')
+    || request.permissions?.includes('receive_missing_work_alerts');
+  if (!mayMonitor) {
+    response.status(403).json({ message: 'لا تملك صلاحية متابعة تسجيل العمل اليومي.' });
+    return;
+  }
+  try {
+    const result = await db.query(
+      `WITH current_day AS (
+         SELECT (now() AT TIME ZONE 'Asia/Gaza')::date AS work_date
+       ), scoped_employees AS (
+         SELECT u.id, u.full_name_ar, u.employee_number, u.job_title_ar
+           FROM users u
+          WHERE u.role_code = 'employee' AND u.is_active = true
+            AND ($1::text = 'system_admin' OR u.department_id = $2::uuid)
+       ), today_logs AS (
+         SELECT l.id, l.user_id, l.work_date, l.created_at, l.work_mode,
+                l.work_region, l.description_ar, u.full_name_ar
+           FROM work_logs l JOIN users u ON u.id = l.user_id CROSS JOIN current_day d
+          WHERE l.work_date = d.work_date
+            AND ($1::text = 'system_admin' OR u.department_id = $2::uuid)
+       )
+       SELECT json_build_object(
+         'date', (SELECT work_date::text FROM current_day),
+         'workLogs', COALESCE((SELECT json_agg(json_build_object(
+           'id', id, 'userId', user_id, 'userNameAr', full_name_ar,
+           'date', work_date::text,
+           'time', to_char(created_at AT TIME ZONE 'Asia/Gaza', 'HH12:MI AM'),
+           'activityAr', description_ar,
+           'location', CASE WHEN work_mode = 'field' THEN 'FIELD' ELSE 'OFFICE' END,
+           'area', CASE WHEN work_region = 'north_gaza' THEN 'شمال قطاع غزة'
+                        WHEN work_region = 'south_gaza' THEN 'جنوب قطاع غزة' ELSE work_region END
+         ) ORDER BY created_at DESC) FROM today_logs), '[]'::json),
+         'missingEmployees', COALESCE((SELECT json_agg(json_build_object(
+           'id', e.id, 'arabicName', e.full_name_ar, 'employeeNumber', e.employee_number,
+           'jobTitleAr', e.job_title_ar
+         ) ORDER BY e.full_name_ar) FROM scoped_employees e
+           WHERE NOT EXISTS (SELECT 1 FROM today_logs l WHERE l.user_id = e.id)), '[]'::json)
+       ) AS snapshot`,
+      [actor.roleCode, actor.departmentId],
+    );
+    response.json(result.rows[0]?.snapshot ?? { date: todayInGaza(), workLogs: [], missingEmployees: [] });
+  } catch {
+    response.status(503).json({ message: 'تعذر تحديث متابعة العمل اليومي.' });
+  }
+});
+
 router.post('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
   if (!request.permissions?.includes('create_work_log')) {

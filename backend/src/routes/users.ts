@@ -105,14 +105,17 @@ router.get('/report-employees', async (request: AuthenticatedRequest, response) 
     return;
   }
   const actor = request.authUser!;
-  const result = await db.query<{ id: string; full_name_ar: string }>(
-    `SELECT id, full_name_ar FROM users
+  const result = await db.query<{ id: string; full_name_ar: string; employee_number: string | null; job_title_ar: string }>(
+    `SELECT id, full_name_ar, employee_number, job_title_ar FROM users
       WHERE role_code = 'employee' AND is_active = true
         AND ($1::text = 'system_admin' OR department_id = $2)
       ORDER BY full_name_ar`,
     [actor.roleCode, actor.departmentId],
   );
-  response.json({ employees: result.rows.map((row) => ({ id: row.id, arabicName: row.full_name_ar })) });
+  response.json({ employees: result.rows.map((row) => ({
+    id: row.id, arabicName: row.full_name_ar,
+    employeeNumber: row.employee_number ?? undefined, jobTitleAr: row.job_title_ar,
+  })) });
 });
 
 router.get('/job-titles', async (request: AuthenticatedRequest, response) => {

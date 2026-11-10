@@ -58,7 +58,7 @@ export const AuthPage: React.FC = () => {
 
   return (
     <main className="auth-page min-h-screen bg-brand-lightGray text-brand-charcoal p-4 sm:p-8">
-      <div className="max-w-6xl mx-auto grid lg:grid-cols-2 items-stretch py-8 lg:py-16">
+      <div className="max-w-6xl mx-auto grid lg:grid-cols-2 items-stretch">
         <section className="space-y-6">
           <p className="auth-system-title">نظام إدارة أعمال دائرة الإعلام</p>
           <img src={organizationLogo} alt="شعار المؤسسة" className="w-28 h-28 object-contain" />
