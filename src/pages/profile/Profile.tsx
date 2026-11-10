@@ -6,12 +6,13 @@ import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
 
 export const Profile: React.FC = () => {
-  const { currentUser, updateUser, notifications, t, signOut } = useApp();
+  const { currentUser, updateUser, notifications, t, signOut, notify } = useApp();
   const navigate = useNavigate();
   const [name, setName] = useState(currentUser.arabicName);
   const [mobile, setMobile] = useState(currentUser.mobile || '');
   const [avatar, setAvatar] = useState(currentUser.avatar || '');
   const [saving, setSaving] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
@@ -29,12 +30,14 @@ export const Profile: React.FC = () => {
 
   async function selectAvatar(file?: File) {
     if (!file) return;
-    if (!file.type.startsWith('image/')) { setMessage('اختر ملف صورة صالحاً.'); return; }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setMessage('اختر صورة بصيغة JPG أو PNG أو WebP.'); notify('اختر صورة بصيغة JPG أو PNG أو WebP.', 'error'); return; }
     const objectUrl = URL.createObjectURL(file);
+    setAvatarSaving(true);
     try {
       const image = new Image();
       image.src = objectUrl;
       await image.decode();
+      if (!image.naturalWidth || !image.naturalHeight) throw new Error('تعذر قراءة أبعاد الصورة؛ اختر ملفاً آخر.');
       const edge = 320;
       const scale = Math.min(1, edge / Math.max(image.naturalWidth, image.naturalHeight));
       const canvas = document.createElement('canvas');
@@ -43,11 +46,30 @@ export const Profile: React.FC = () => {
       const context = canvas.getContext('2d');
       if (!context) throw new Error('تعذر تجهيز الصورة.');
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      setAvatar(canvas.toDataURL('image/jpeg', 0.78));
-      setMessage('تم تجهيز الصورة. اضغط «حفظ التغييرات» لتثبيتها.');
-    } catch {
-      setMessage('تعذر قراءة الصورة؛ جرّب ملفاً آخر.');
-    } finally { URL.revokeObjectURL(objectUrl); }
+      let compressed = canvas.toDataURL('image/jpeg', 0.72);
+      for (const quality of [0.58, 0.46, 0.36]) {
+        if (compressed.length <= 340_000) break;
+        compressed = canvas.toDataURL('image/jpeg', quality);
+      }
+      if (compressed.length > 340_000) throw new Error('الصورة كبيرة جداً. اختر صورة أصغر.');
+
+      setMessage('جارٍ رفع الصورة…');
+      const response = await fetch('/api/users/me/profile', {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ arabicName: currentUser.arabicName, mobile: currentUser.mobile || '', avatar: compressed }),
+      });
+      const payload = await response.json() as { user?: { avatar?: string }; message?: string };
+      if (!response.ok || !payload.user) throw new Error(payload.message || 'تعذر رفع الصورة.');
+      const savedAvatar = payload.user.avatar || compressed;
+      if (!updateUser({ ...currentUser, avatar: savedAvatar })) throw new Error('تم رفع الصورة لكن تعذر تحديث بيانات العرض؛ حدّث الصفحة.');
+      setAvatar(savedAvatar);
+      setMessage('تم رفع الصورة وحفظها في حسابك.');
+      notify('تم رفع الصورة الشخصية وحفظها.', 'success');
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'تعذر قراءة الصورة؛ جرّب ملفاً آخر.';
+      setMessage(message);
+      notify(message, 'error');
+    } finally { URL.revokeObjectURL(objectUrl); setAvatarSaving(false); }
   }
 
   async function save() {
@@ -58,8 +80,11 @@ export const Profile: React.FC = () => {
       if (!response.ok) throw new Error(payload.message || 'تعذر حفظ الملف الشخصي.');
       const ok = updateUser({ ...currentUser, arabicName: name, englishName: name, mobile, avatar: avatar || undefined, preferredLanguage: 'ar' });
       setMessage(ok ? 'تم حفظ الملف الشخصي.' : 'تعذر تحديث بيانات العرض.');
+      notify(ok ? 'تم حفظ الملف الشخصي.' : 'تعذر تحديث بيانات العرض.', ok ? 'success' : 'error');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'تعذر الاتصال بالخادم.');
+      const message = error instanceof Error ? error.message : 'تعذر الاتصال بالخادم.';
+      setMessage(message);
+      notify(message, 'error');
     } finally { setSaving(false); }
   }
 
@@ -77,14 +102,17 @@ export const Profile: React.FC = () => {
       if (!response.ok) throw new Error(payload.message || 'تعذر تغيير كلمة المرور.');
       setCurrentPassword(''); setPassword(''); setConfirm('');
       setMessage(payload.message || 'تم تغيير كلمة المرور بنجاح.');
+      notify(payload.message || 'تم تغيير كلمة المرور بنجاح.', 'success');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'تعذر الاتصال بالخادم.');
+      const message = error instanceof Error ? error.message : 'تعذر الاتصال بالخادم.';
+      setMessage(message);
+      notify(message, 'error');
     } finally { setPasswordSaving(false); }
   }
 
   return <main className="mx-auto max-w-3xl space-y-4" dir="rtl">
     <header className="app-page-heading"><h1 className="mt-2 text-2xl font-bold">الملف الشخصي</h1><p>إدارة بيانات الحساب والتواصل.</p></header>
-    <Card title="الصورة الشخصية"><div className="flex flex-wrap items-center gap-4"><div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-brand-border bg-brand-plum text-3xl font-bold text-white">{avatar?<img src={avatar} alt={`الصورة الشخصية لـ ${currentUser.arabicName}`} className="h-full w-full object-cover"/>:currentUser.arabicName.charAt(0)}</div><div className="space-y-2"><label className="inline-flex min-h-10 cursor-pointer items-center rounded-input bg-brand-magenta px-4 text-sm font-bold text-white hover:brightness-110">اختيار صورة<input className="sr-only" type="file" accept="image/*" onChange={event=>void selectAvatar(event.target.files?.[0])}/></label>{avatar&&<Button variant="outline" size="sm" onClick={()=>setAvatar('')}>إزالة الصورة</Button>}<p className="text-xs text-brand-charcoal">سيتم تصغير الصورة تلقائياً قبل حفظها.</p></div></div></Card>
+    <Card title="الصورة الشخصية"><div className="flex flex-wrap items-center gap-4"><div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-brand-border bg-brand-plum text-3xl font-bold text-white">{avatar?<img src={avatar} alt={`الصورة الشخصية لـ ${currentUser.arabicName}`} className="h-full w-full object-cover"/>:currentUser.arabicName.charAt(0)}</div><div className="space-y-2"><label className={`inline-flex min-h-10 cursor-pointer items-center rounded-input px-4 text-sm font-bold text-white ${avatarSaving?'pointer-events-none bg-brand-charcoal/50':'bg-brand-magenta hover:brightness-110'}`}>{avatarSaving?'جارٍ رفع الصورة…':'اختيار ورفع صورة'}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={avatarSaving} onChange={event=>{void selectAvatar(event.target.files?.[0]);event.currentTarget.value='';}}/></label>{avatar&&<Button variant="outline" size="sm" disabled={avatarSaving} onClick={()=>setAvatar('')}>إزالة الصورة</Button>}<p className="text-xs text-brand-charcoal">تُرفع الصورة تلقائياً بعد اختيارها، وتُضغط لتناسب التخزين.</p></div></div></Card>
     <Card title="البيانات الشخصية"><div className="grid gap-3 sm:grid-cols-2">
       <label className="text-sm">الاسم<input className="mt-1 block w-full rounded-input border border-brand-border p-3" dir="rtl" value={name} onChange={e=>setName(e.target.value)}/></label>
       <label className="text-sm">المسمى الوظيفي<input className="mt-1 block w-full rounded-input border border-brand-border bg-brand-lightGray/40 p-3" readOnly value={currentUser.jobTitleAr}/></label>

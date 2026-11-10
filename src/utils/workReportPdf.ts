@@ -179,15 +179,11 @@ export async function downloadWorkReportPdf(
   });
 
   const range = `${reportFrom || 'كل-الفترة'}-${reportTo || 'حتى-اليوم'}`;
+  const filename = `كشف-الأعمال-${range}.pdf`;
   const blob = doc.output('blob');
-  if (!(blob instanceof Blob) || blob.size === 0) throw new Error('تعذر تجهيز ملف PDF؛ حاول تنزيل الكشف مرة أخرى.');
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = objectUrl;
-  link.download = `كشف-الأعمال-${range}.pdf`;
-  link.style.display = 'none';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  if (!(blob instanceof Blob) || blob.size === 0 || blob.type !== 'application/pdf') {
+    throw new Error('تعذر تجهيز ملف PDF صالح؛ حاول تنزيل الكشف مرة أخرى.');
+  }
+  // jsPDF uses the browser's native download flow and avoids opening a preview tab.
+  await doc.save(filename, { returnPromise: true });
 }

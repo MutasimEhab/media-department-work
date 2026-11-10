@@ -30,7 +30,7 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) => {
-  const { setCurrentUser } = useApp();
+  const { setCurrentUser, notify } = useApp();
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [accountTypes, setAccountTypes] = useState<AccountTypeOption[]>([]);
@@ -118,11 +118,13 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'تعذر إنشاء الحساب.');
       setNotice(`تم إنشاء الحساب وحفظه. اسم المستخدم: ${payload.user?.username || form.username} — شارك كلمة المرور مع الموظف بشكل آمن.`);
+      notify('تم إنشاء الحساب وحفظه.', 'success');
       setForm((previous) => ({ ...previous, arabicName: '', username: '', email: '', jobTitleAr: '', employeeNumber: '', mobile: '', password: '' }));
       setShowForm(false);
       await loadUsers();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+      const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.';
+      setError(message); notify(message, 'error');
     } finally {
       setSaving(false);
     }
@@ -139,7 +141,8 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       setJobTitles((values) => [...values, payload.jobTitle].sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
       setJobTitleDraft('');
       setNotice('تمت إضافة المسمى الوظيفي إلى القائمة.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.'); }
+      notify('تمت إضافة المسمى الوظيفي إلى القائمة.', 'success');
+    } catch (cause) { const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.'; setError(message); notify(message, 'error'); }
   }
 
   async function renameJobTitle(item: JobTitleOption) {
@@ -152,7 +155,8 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       setJobTitles((values) => values.map((value) => value.id === item.id ? payload.jobTitle : value).sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
       setJobTitleEdits((values) => ({ ...values, [item.id]: nameAr }));
       setNotice('تم تعديل المسمى الوظيفي.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.'); }
+      notify('تم تعديل المسمى الوظيفي.', 'success');
+    } catch (cause) { const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.'; setError(message); notify(message, 'error'); }
   }
 
   async function openPermissions(user: User) {
@@ -186,9 +190,11 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'تعذر حفظ الصلاحيات.');
       setNotice(`تم حفظ صلاحيات ${permissionTarget.arabicName}.`);
+      notify(`تم حفظ صلاحيات ${permissionTarget.arabicName}.`, 'success');
       setPermissionTarget(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+      const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.';
+      setError(message); notify(message, 'error');
     } finally {
       setPermissionSaving(false);
     }
@@ -218,8 +224,10 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       setProfileTarget(null);
       await loadUsers();
       setNotice('تم تحديث المسمى الوظيفي والرقم الوظيفي.');
+      notify('تم تحديث المسمى الوظيفي والرقم الوظيفي.', 'success');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+      const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.';
+      setError(message); notify(message, 'error');
     } finally {
       setProfileSaving(false);
     }
@@ -243,14 +251,20 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       });
       const payload = await readApiPayload(response, 'تعذر ربط الحساب بالدائرة.');
       const department = payload.department as DepartmentOption;
+      setUsers(previous => previous.map(user => user.id === departmentTarget.id
+        ? { ...user, departmentId: department.id, departmentAr: department.nameAr, departmentEn: department.nameAr }
+        : user));
       if (departmentTarget.id === currentUser.id) {
-        setCurrentUser({ ...currentUser, departmentAr: department.nameAr, departmentEn: department.nameAr });
+        setCurrentUser({ ...currentUser, departmentId: department.id, departmentAr: department.nameAr, departmentEn: department.nameAr });
       }
       setDepartmentTarget(null);
       await loadUsers();
       setNotice(`تم ربط حساب ${departmentTarget.arabicName} بدائرة ${department.nameAr}.`);
+      notify(`تم ربط حساب ${departmentTarget.arabicName} بدائرة ${department.nameAr}.`, 'success');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+      const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.';
+      setError(message);
+      notify(message, 'error');
     } finally {
       setDepartmentSaving(false);
     }
@@ -269,8 +283,10 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       if (!response.ok) throw new Error(payload.message || 'تعذر تغيير حالة الحساب.');
       await loadUsers();
       setNotice(`تم ${action} الحساب بنجاح.`);
+      notify(`تم ${action} الحساب بنجاح.`, 'success');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+      const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.';
+      setError(message); notify(message, 'error');
     }
   }
 
@@ -285,8 +301,10 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
       if (!response.ok) throw new Error(payload.message || 'تعذر حذف الحساب.');
       await loadUsers();
       setNotice('تم حذف الحساب نهائياً.');
+      notify('تم حذف الحساب نهائياً.', 'success');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+      const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.';
+      setError(message); notify(message, 'error');
     }
   }
 
@@ -338,7 +356,8 @@ export const DatabaseUsers: React.FC<{ currentUser: User }> = ({ currentUser }) 
           || currentUser.role === 'MANAGER' && ['EMPLOYEE', 'DEPUTY'].includes(user.role)
           || currentUser.role === 'DEPUTY' && user.role === 'EMPLOYEE';
         const accountTypeName = user.accountTypeNameAr || roleLabels[user.role];
-        return <article key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-border p-4"><div><b>{user.arabicName}</b><p>{user.jobTitleAr} · {accountTypeName} · {user.isActive ? 'نشط' : 'غير نشط'}</p><p>الرقم الوظيفي: <span dir="ltr">{user.employeeNumber || 'غير محدد'}</span></p><p>{user.departmentAr || 'غير مرتبط بدائرة'}</p><p dir="ltr">اسم المستخدم: {user.username} · البريد: {user.email || 'غير مسجل'} · {user.mobile || '—'}</p></div><div className="flex flex-wrap gap-2">{currentUser.role === 'ADMIN' && <Button size="sm" variant="outline" onClick={() => openDepartmentLink(user)}>ربط الدائرة</Button>}{canEditProfile && <Button size="sm" variant="outline" onClick={() => editProfile(user)}>تعديل المسمى والرقم</Button>}{canManageAccount && <><Button size="sm" variant="outline" onClick={() => void openPermissions(user)}>إدارة الصلاحيات</Button><Button size="sm" variant="outline" onClick={() => void changeAccountStatus(user, !user.isActive)}>{user.isActive ? 'إيقاف الحساب' : 'إعادة التفعيل'}</Button><Button size="sm" variant="danger" onClick={() => void deleteAccount(user)}>حذف الحساب</Button></>}</div></article>;
+        const departmentLinked = Boolean(user.departmentId || user.departmentAr);
+        return <article key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-border p-4"><div><b>{user.arabicName}</b><p>{user.jobTitleAr} · {accountTypeName} · {user.isActive ? 'نشط' : 'غير نشط'}</p><p>الرقم الوظيفي: <span dir="ltr">{user.employeeNumber || 'غير محدد'}</span></p><p>{user.departmentAr || 'غير مرتبط بدائرة'}</p><p dir="ltr">اسم المستخدم: {user.username} · البريد: {user.email || 'غير مسجل'} · {user.mobile || '—'}</p></div><div className="flex flex-wrap gap-2">{currentUser.role === 'ADMIN' && <Button size="sm" variant={departmentLinked ? 'secondary' : 'outline'} disabled={departmentLinked} title={departmentLinked ? `مرتبط بـ ${user.departmentAr}` : 'ربط الحساب بدائرة'} onClick={() => openDepartmentLink(user)}>{departmentLinked ? 'مرتبط بالدائرة ✓' : 'ربط الدائرة'}</Button>}{canEditProfile && <Button size="sm" variant="outline" onClick={() => editProfile(user)}>تعديل المسمى والرقم</Button>}{canManageAccount && <><Button size="sm" variant="outline" onClick={() => void openPermissions(user)}>إدارة الصلاحيات</Button><Button size="sm" variant="outline" onClick={() => void changeAccountStatus(user, !user.isActive)}>{user.isActive ? 'إيقاف الحساب' : 'إعادة التفعيل'}</Button><Button size="sm" variant="danger" onClick={() => void deleteAccount(user)}>حذف الحساب</Button></>}</div></article>;
       })}</div> : <p className="mt-4">لا توجد حسابات مطابقة.</p>}
     </Card>
 

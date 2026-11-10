@@ -54,7 +54,7 @@ export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
         return (
           <div
             key={toast.id}
-            role="status"
+            role={toast.type === 'error' ? 'alert' : 'status'}
             className={`
               pointer-events-auto flex items-center justify-between gap-3 p-4 rounded-card border shadow-dialog
               ${conf.bg} ${conf.text} ${conf.border}
