@@ -105,6 +105,7 @@ export interface CircularRecipient {
 
 export interface Circular {
   id: string; // CIR-301
+  departmentId?: string;
   titleAr: string;
   titleEn: string;
   contentAr: string;

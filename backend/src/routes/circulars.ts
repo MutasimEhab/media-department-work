@@ -17,6 +17,7 @@ function mapCircularRows(rows: Array<Record<string, any>>) {
     if (!circular) {
       circular = {
         id: row.id, titleAr: row.title_ar, titleEn: row.title_ar,
+        departmentId: row.department_id,
         contentAr: row.body_ar, contentEn: row.body_ar,
         issuerId: row.issued_by, issuerNameAr: row.issuer_name, issuerNameEn: row.issuer_name,
         issuedAt: row.published_at ?? row.created_at, targetAudience: audienceToUi[row.audience_type] ?? 'EVERYONE',
@@ -37,7 +38,7 @@ function mapCircularRows(rows: Array<Record<string, any>>) {
   return [...circulars.values()];
 }
 
-const circularSelect = `SELECT c.id, c.issued_by, c.title_ar, c.body_ar, c.audience_type, c.status,
+const circularSelect = `SELECT c.id, c.department_id, c.issued_by, c.title_ar, c.body_ar, c.audience_type, c.status,
        c.published_at, c.created_at, c.parent_id, c.notify_email, c.notify_sms,
        issuer.full_name_ar AS issuer_name, cr.user_id AS recipient_user_id,
        cr.user_id AS recipient_id, recipient.full_name_ar AS recipient_name,
@@ -100,10 +101,18 @@ async function saveCircular(request: AuthenticatedRequest, response: import('exp
     const departmentResult = await client.query<{ department_id: string | null }>(
       'SELECT department_id FROM users WHERE id = $1', [actor.id],
     );
-    const departmentId = departmentResult.rows[0]?.department_id ?? null;
+    const departmentId = actor.roleCode === 'system_admin'
+      ? (typeof body.departmentId === 'string' && body.departmentId ? body.departmentId : departmentResult.rows[0]?.department_id ?? null)
+      : departmentResult.rows[0]?.department_id ?? null;
     if (!departmentId) {
       await client.query('ROLLBACK');
-      response.status(400).json({ message: 'حسابك غير مرتبط بدائرة.' });
+      response.status(400).json({ message: actor.roleCode === 'system_admin' ? 'اختر الدائرة التي تريد توجيه التعميم إليها.' : 'حسابك غير مرتبط بدائرة؛ يرجى مراجعة مدير النظام.' });
+      return;
+    }
+    const departmentExists = await client.query('SELECT id FROM departments WHERE id = $1', [departmentId]);
+    if (!departmentExists.rows[0]) {
+      await client.query('ROLLBACK');
+      response.status(400).json({ message: 'الدائرة المختارة غير موجودة؛ حدّث القائمة ثم أعد المحاولة.' });
       return;
     }
 
@@ -132,11 +141,11 @@ async function saveCircular(request: AuthenticatedRequest, response: import('exp
     let circularId = id;
     if (id) {
       const updated = await client.query(
-        `UPDATE circulars SET title_ar = $3, body_ar = $4, audience_type = $5,
-             status = $6, published_at = CASE WHEN $6 = 'published' THEN now() ELSE NULL END,
-             notify_email = $7, notify_sms = $8
+        `UPDATE circulars SET department_id = $3, title_ar = $4, body_ar = $5, audience_type = $6,
+             status = $7, published_at = CASE WHEN $7 = 'published' THEN now() ELSE NULL END,
+             notify_email = $8, notify_sms = $9
            WHERE id = $1 AND issued_by = $2 AND status = 'draft' RETURNING id`,
-        [id, actor.id, title, content, audience, publish ? 'published' : 'draft', body.notifyEmail === true, body.notifySms === true],
+        [id, actor.id, departmentId, title, content, audience, publish ? 'published' : 'draft', body.notifyEmail === true, body.notifySms === true],
       );
       if (!updated.rows[0]) {
         await client.query('ROLLBACK');

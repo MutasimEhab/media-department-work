@@ -24,6 +24,7 @@ export const Topbar: React.FC = () => {
     setTheme,
     t,
     institutionLogo,
+    institutionName,
   } = useApp();
 
   const [openMenu, setOpenMenu] = useState<'notifications' | 'user' | null>(null);
@@ -61,7 +62,7 @@ export const Topbar: React.FC = () => {
         {institutionLogo && <img src={institutionLogo} alt={t.app.subTitle} className="h-10 w-10 shrink-0 object-contain" />}
         <div className="min-w-0">
           <h1 className="truncate text-xs font-bold text-brand-darkText sm:text-sm">{t.app.title}</h1>
-          <p className="truncate text-[10px] text-brand-charcoal/75 sm:text-[11px]">{language === 'ar' ? currentUser.departmentAr : currentUser.departmentEn} · {t.app.subTitle}</p>
+          <p className="truncate text-[10px] text-brand-charcoal/75 sm:text-[11px]">{institutionName} · {language === 'ar' ? currentUser.departmentAr : currentUser.departmentEn}</p>
           <p className="truncate text-[10px] font-semibold text-brand-plum sm:text-[11px]">{currentUser.jobTitleAr || t.roles[currentUser.role]} · الرقم الوظيفي: <bdi dir="ltr">{currentUser.employeeNumber || '—'}</bdi></p>
         </div>
       </div>

@@ -39,6 +39,8 @@ interface AppContextType {
   today: string;
   institutionLogo: string;
   setInstitutionLogo: (logo: string) => void;
+  institutionName: string;
+  setInstitutionName: (name: string) => void;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
@@ -133,6 +135,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     catch { return ''; }
   });
   const setInstitutionLogo = useCallback((logo: string) => setInstitutionLogoState(logo), []);
+  const [institutionName, setInstitutionNameState] = useState(() => {
+    try { return String((JSON.parse(localStorage.getItem('official_system_settings') || '{}') as { institution?: string }).institution || 'مؤسسة السمع والبصر للتنمية والتأهيل المجتمعي'); }
+    catch { return 'مؤسسة السمع والبصر للتنمية والتأهيل المجتمعي'; }
+  });
+  const setInstitutionName = useCallback((name: string) => setInstitutionNameState(name), []);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const dismissToast = useCallback((id: string) => setToasts(previous => previous.filter(item => item.id !== id)), []);
   const notify = useCallback((message: string, type: ToastType = 'success') => {
@@ -196,16 +203,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetch('/api/system-settings', { credentials: 'include' })
       .then(async response => {
         if (!response.ok) return null;
-        return await response.json() as { settings?: Record<string, unknown> | null };
+          return await response.json() as { settings?: Record<string, unknown> | null };
       })
       .then(payload => {
         if (cancelled || !payload?.settings) return;
         try { localStorage.setItem('official_system_settings', JSON.stringify(payload.settings)); } catch { /* settings stay available from server on next session */ }
         setInstitutionLogo(String(payload.settings.organizationLogo || ''));
+          if (typeof payload.settings.institution === 'string' && payload.settings.institution.trim()) setInstitutionName(payload.settings.institution);
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
-  }, [isAuthenticated, currentUser.id]);
+    }, [isAuthenticated, currentUser.id, setInstitutionName]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -641,6 +649,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({
           titleAr: circular.titleAr, contentAr: circular.contentAr, targetAudience: circular.targetAudience,
           recipientIds: circular.recipients.map(recipient => recipient.userId),
+          departmentId: circular.departmentId,
           notifyEmail: circular.emailDelivery, notifySms: circular.smsDelivery,
           parentId: circular.parentId, publish,
         }),
@@ -787,6 +796,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         today,
         institutionLogo,
         setInstitutionLogo,
+        institutionName,
+        setInstitutionName,
         isSidebarOpen,
         setIsSidebarOpen,
         toggleSidebar,

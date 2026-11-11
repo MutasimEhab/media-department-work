@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -8,7 +8,7 @@ import { Circular } from '../../types';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 export const CircularEditor: React.FC = () => {
-  const { language, currentUser, users, circulars, saveCircular } = useApp();
+  const { language, currentUser, users, circulars, saveCircular, notify } = useApp();
   const ar = language === 'ar';
   const tx = (a: string, e: string) => ar ? a : e;
   const { id } = useParams();
@@ -21,12 +21,33 @@ export const CircularEditor: React.FC = () => {
   const [selected, setSelected] = useState<string[]>(base?.isDraft ? base.recipients.map(recipient => recipient.userId) : []);
   const [email, setEmail] = useState(base?.emailDelivery ?? false);
   const [sms, setSms] = useState(base?.smsDelivery ?? false);
+  const isSystemAdmin = currentUser.role === 'ADMIN';
+  const [departments, setDepartments] = useState<Array<{ id: string; nameAr: string }>>([]);
+  const [departmentId, setDepartmentId] = useState(base?.departmentId || currentUser.departmentId || '');
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
   useEscapeKey(confirm, () => setConfirm(false));
 
-  const activeEmployees = users.filter(user => user.isActive && user.role === 'EMPLOYEE');
-  const activeUsers = users.filter(user => user.isActive);
+  useEffect(() => {
+    if (!isSystemAdmin) return;
+    let cancelled = false;
+    fetch('/api/users/departments', { credentials: 'include' })
+      .then(async response => {
+        const payload = await response.json() as { departments?: Array<{ id: string; nameAr: string }>; message?: string };
+        if (!response.ok) throw new Error(payload.message || 'تعذر تحميل قائمة الدوائر.');
+        if (!cancelled) {
+          const list = payload.departments || [];
+          setDepartments(list);
+          setDepartmentId(current => current || (list.length === 1 ? list[0]!.id : ''));
+        }
+      })
+      .catch(cause => { if (!cancelled) notify(cause instanceof Error ? cause.message : 'تعذر تحميل قائمة الدوائر.', 'error'); });
+    return () => { cancelled = true; };
+  }, [isSystemAdmin, notify]);
+
+  const scopedUsers = users.filter(user => user.isActive && (!isSystemAdmin || (departmentId && user.departmentId === departmentId)));
+  const activeEmployees = scopedUsers.filter(user => user.role === 'EMPLOYEE');
+  const activeUsers = scopedUsers;
   const recipients = audience === 'SPECIFIC' ? selected : audience === 'EMPLOYEES_ONLY'
     ? activeEmployees.map(user => user.id)
     : audience === 'MANAGEMENT_ONLY'
@@ -36,6 +57,7 @@ export const CircularEditor: React.FC = () => {
 
   async function save(publish: boolean) {
     if (!title.trim() || !body.trim()) { setError('content'); return; }
+    if (isSystemAdmin && !departmentId) { setError('department'); return; }
     if (publish && !recipients.length) { setError('recipients'); return; }
     const targets = recipients.map(userId => {
       const user = users.find(candidate => candidate.id === userId)!;
@@ -43,6 +65,7 @@ export const CircularEditor: React.FC = () => {
     });
     const circular: Circular = {
       id: base?.id && !immutable ? base.id : `CIR-${304 + circulars.filter(item => /^CIR-\d+$/.test(item.id)).length - 3}`,
+      departmentId: isSystemAdmin ? departmentId : currentUser.departmentId,
       titleAr: title.trim(),
       titleEn: title.trim(),
       contentAr: body.trim(),
@@ -72,13 +95,14 @@ export const CircularEditor: React.FC = () => {
       <label className="mt-4 block text-sm font-subheading">{tx('نص التعميم','Circular content')}<textarea className="mt-1 block w-full rounded-input border border-brand-border p-3" rows={6} value={body} onChange={event=>setBody(event.target.value)} dir="rtl" disabled={immutable} placeholder={tx('اكتب محتوى التعميم بالعربية','Enter circular content in Arabic')}/></label>
     </Card>
     <Card title={tx('الجمهور','Audience')}>
-      <select className="w-full rounded-input border border-brand-border p-3" value={audience} onChange={event=>setAudience(event.target.value as typeof audience)}><option value="EVERYONE">{tx('الجميع','Everyone')}</option><option value="EMPLOYEES_ONLY">{tx('الموظفون فقط','Employees only')}</option><option value="SPECIFIC">{tx('أشخاص محددون','Specific people')}</option></select>
+      {isSystemAdmin && <label className="mb-3 block text-sm font-semibold">الدائرة المستهدفة<select className="mt-1 block w-full rounded-input border border-brand-border p-3" value={departmentId} onChange={event=>{setDepartmentId(event.target.value);setSelected([]);}} disabled={immutable}><option value="">اختر الدائرة</option>{departments.map(department=><option key={department.id} value={department.id}>{department.nameAr}</option>)}</select><span className="mt-1 block text-xs font-normal text-brand-charcoal">اختر الدائرة التي سيصل إليها التعميم؛ لن يُرسل إلى بقية الدوائر.</span></label>}
+      <select className="w-full rounded-input border border-brand-border p-3" value={audience} onChange={event=>setAudience(event.target.value as typeof audience)}><option value="EVERYONE">{tx('الجميع','Everyone')}</option><option value="EMPLOYEES_ONLY">{tx('الموظفون فقط','Employees only')}</option><option value="MANAGEMENT_ONLY">{tx('الإدارة فقط','Management only')}</option><option value="SPECIFIC">{tx('أشخاص محددون','Specific people')}</option></select>
       {audience==='MANAGEMENT_ONLY'&&<p className="mt-3 text-sm">{tx('سيصل التعميم إلى الإدارة في دائرتك.','The circular will go to management in your department.')}</p>}
       {audience==='SPECIFIC'&&<div className="mt-3"><MultiSelect label={tx('المستلمون','Recipients')} options={recipientOptions} value={selected} onChange={setSelected}/></div>}
       <p className="mt-3">{tx('معاينة المستلمين','Recipient preview')}: {recipients.length} · {recipients.map(userId=>{const user=users.find(candidate=>candidate.id===userId);return ar?user?.arabicName:user?.englishName}).filter(Boolean).join('، ')}</p>
     </Card>
     <Card title={tx('قنوات إضافية (محاكاة)','Optional channels (simulated)')}><label className="me-4"><input type="checkbox" checked={email} onChange={event=>setEmail(event.target.checked)}/> {tx('البريد الإلكتروني','Email')}</label><label><input type="checkbox" checked={sms} onChange={event=>setSms(event.target.checked)}/> {tx('الرسائل النصية','SMS')}</label><p className="text-sm">{tx('الإشعار الداخلي دائم؛ البريد والرسائل لا تُرسل فعلياً.','Internal notification is always on; email and SMS are never actually sent.')}</p></Card>
-    {error&&<p role="alert" className="text-sm text-red-700">{error==='content'?tx('أكمل عنوان التعميم ومحتواه بالعربية.','Enter the circular title and content in Arabic.'):tx('لا يمكن النشر من دون مستلمين.','Choose at least one recipient before publishing.')}</p>}
+    {error&&<p role="alert" className="text-sm text-red-700">{error==='content'?tx('أكمل عنوان التعميم ومحتواه بالعربية.','Enter the circular title and content in Arabic.'):error==='department'?'اختر الدائرة أولاً لتحديد مستلمي التعميم.':tx('لا يمكن النشر من دون مستلمين.','Choose at least one recipient before publishing.')}</p>}
     <div className="flex gap-2"><Button variant="outline" onClick={()=>save(false)}>{tx('حفظ مسودة','Save draft')}</Button><Button onClick={()=>setConfirm(true)}>{tx('نشر','Publish')}</Button></div>
     {confirm&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card title={tx('تأكيد النشر','Confirm publication')} className="w-full max-w-md"><p>{tx(`سيتم إنشاء إشعارات داخلية لـ ${recipients.length} مستلم.`,`${recipients.length} internal notifications will be created.`)}</p><p>{tx('لن يتم إرسال بريد أو SMS فعلياً.','Email and SMS delivery are not enabled.')}</p><div className="mt-4 flex gap-2"><Button onClick={()=>save(true)}>{tx('تأكيد النشر','Confirm and publish')}</Button><Button variant="outline" onClick={()=>setConfirm(false)}>{tx('رجوع','Back')}</Button></div></Card></div>}
   </main>;

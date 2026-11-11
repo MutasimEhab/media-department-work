@@ -29,7 +29,7 @@ const ROLES: { id: UserRole; label: string }[] = [
 const WORKDAYS = ['السبت','الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'];
 
 export const SystemSettings: React.FC = () => {
-  const { rolePermissions, updateRolePermission, currentUser, setInstitutionLogo } = useApp();
+  const { rolePermissions, updateRolePermission, currentUser, setInstitutionLogo, setInstitutionName, notify } = useApp();
   const [settings, setSettings] = useState<Settings>(() => {
     try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem('official_system_settings') || '{}') }; }
     catch { return DEFAULT_SETTINGS; }
@@ -77,9 +77,10 @@ export const SystemSettings: React.FC = () => {
       if (!response.ok || !payload.settings) throw new Error(payload.message || 'تعذر حفظ الإعدادات.');
       setSettings(payload.settings);
       setInstitutionLogo(String(payload.settings.organizationLogo || ''));
+      setInstitutionName(payload.settings.institution);
       try { localStorage.setItem('official_system_settings', JSON.stringify(payload.settings)); } catch { /* database save already succeeded */ }
-      setError(''); setSaved(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم؛ لم تُحفظ الإعدادات.'); }
+      setError(''); setSaved(true); notify('تم حفظ إعدادات المؤسسة والنظام بنجاح.');
+    } catch (cause) { const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم؛ لم تُحفظ الإعدادات.'; setError(message); notify(message, 'error'); }
     finally { setSavingSettings(false); }
   }
 
