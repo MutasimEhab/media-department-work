@@ -30,22 +30,38 @@ export const Profile: React.FC = () => {
 
   async function selectAvatar(file?: File) {
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setMessage('اختر صورة بصيغة JPG أو PNG أو WebP.'); notify('اختر صورة بصيغة JPG أو PNG أو WebP.', 'error'); return; }
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/bmp', 'image/gif'];
+    if (file.type && !supportedTypes.includes(file.type)) { setMessage('هذا النوع من الصور غير مدعوم. احفظ الصورة بصيغة JPG أو PNG ثم أعد اختيارها.'); notify('نوع الصورة غير مدعوم؛ استخدم JPG أو PNG أو WebP.', 'error'); return; }
+    if (file.size > 15 * 1024 * 1024) { setMessage('حجم الصورة أكبر من 15 ميغابايت. اختر صورة أصغر.'); notify('حجم الصورة أكبر من 15 ميغابايت.', 'error'); return; }
     const objectUrl = URL.createObjectURL(file);
     setAvatarSaving(true);
     try {
-      const image = new Image();
-      image.src = objectUrl;
-      await image.decode();
-      if (!image.naturalWidth || !image.naturalHeight) throw new Error('تعذر قراءة أبعاد الصورة؛ اختر ملفاً آخر.');
+      // Some browsers reject HTMLImageElement.decode() for otherwise readable files.
+      // Prefer createImageBitmap, then fall back to the image load event instead of decode().
+      let source: ImageBitmap | HTMLImageElement;
+      try {
+        source = await createImageBitmap(file);
+      } catch {
+        source = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = () => reject(new Error('لم يتمكن المتصفح من قراءة الصورة. احفظها بصيغة JPG أو PNG ثم أعد اختيارها.'));
+          image.src = objectUrl;
+        });
+      }
+      const isBitmap = typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap;
+      const sourceWidth = isBitmap ? (source as ImageBitmap).width : (source as HTMLImageElement).naturalWidth;
+      const sourceHeight = isBitmap ? (source as ImageBitmap).height : (source as HTMLImageElement).naturalHeight;
+      if (!sourceWidth || !sourceHeight) throw new Error('الصورة لا تحتوي على أبعاد قابلة للقراءة. اختر صورة أخرى بصيغة JPG أو PNG.');
       const edge = 320;
-      const scale = Math.min(1, edge / Math.max(image.naturalWidth, image.naturalHeight));
+      const scale = Math.min(1, edge / Math.max(sourceWidth, sourceHeight));
       const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+      canvas.height = Math.max(1, Math.round(sourceHeight * scale));
       const context = canvas.getContext('2d');
       if (!context) throw new Error('تعذر تجهيز الصورة.');
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      context.drawImage(source, 0, 0, canvas.width, canvas.height);
+      if (isBitmap) (source as ImageBitmap).close();
       let compressed = canvas.toDataURL('image/jpeg', 0.72);
       for (const quality of [0.58, 0.46, 0.36]) {
         if (compressed.length <= 340_000) break;
@@ -112,7 +128,7 @@ export const Profile: React.FC = () => {
 
   return <main className="mx-auto max-w-3xl space-y-4" dir="rtl">
     <header className="app-page-heading"><h1 className="mt-2 text-2xl font-bold">الملف الشخصي</h1><p>إدارة بيانات الحساب والتواصل.</p></header>
-    <Card title="الصورة الشخصية"><div className="flex flex-wrap items-center gap-4"><div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-brand-border bg-brand-plum text-3xl font-bold text-white">{avatar?<img src={avatar} alt={`الصورة الشخصية لـ ${currentUser.arabicName}`} className="h-full w-full object-cover"/>:currentUser.arabicName.charAt(0)}</div><div className="space-y-2"><label className={`inline-flex min-h-10 cursor-pointer items-center rounded-input px-4 text-sm font-bold text-white ${avatarSaving?'pointer-events-none bg-brand-charcoal/50':'bg-brand-magenta hover:brightness-110'}`}>{avatarSaving?'جارٍ رفع الصورة…':'اختيار ورفع صورة'}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={avatarSaving} onChange={event=>{void selectAvatar(event.target.files?.[0]);event.currentTarget.value='';}}/></label>{avatar&&<Button variant="outline" size="sm" disabled={avatarSaving} onClick={()=>setAvatar('')}>إزالة الصورة</Button>}<p className="text-xs text-brand-charcoal">تُرفع الصورة تلقائياً بعد اختيارها، وتُضغط لتناسب التخزين.</p></div></div></Card>
+    <Card title="الصورة الشخصية"><div className="flex flex-wrap items-center gap-4"><div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-brand-border bg-brand-plum text-3xl font-bold text-white">{avatar?<img src={avatar} alt={`الصورة الشخصية لـ ${currentUser.arabicName}`} className="h-full w-full object-cover"/>:currentUser.arabicName.charAt(0)}</div><div className="space-y-2"><label className={`inline-flex min-h-10 cursor-pointer items-center rounded-input px-4 text-sm font-bold text-white ${avatarSaving?'pointer-events-none bg-brand-charcoal/50':'bg-brand-magenta hover:brightness-110'}`}>{avatarSaving?'جارٍ رفع الصورة…':'اختيار ورفع صورة'}<input className="sr-only" type="file" accept="image/*" disabled={avatarSaving} onChange={event=>{void selectAvatar(event.target.files?.[0]);event.currentTarget.value='';}}/></label>{avatar&&<Button variant="outline" size="sm" disabled={avatarSaving} onClick={()=>setAvatar('')}>إزالة الصورة</Button>}<p className="text-xs text-brand-charcoal">اختر صورة حتى 15 ميغابايت؛ تُضغط إلى JPG قبل حفظها في حسابك.</p></div></div></Card>
     <Card title="البيانات الشخصية"><div className="grid gap-3 sm:grid-cols-2">
       <label className="text-sm">الاسم<input className="mt-1 block w-full rounded-input border border-brand-border p-3" dir="rtl" value={name} onChange={e=>setName(e.target.value)}/></label>
       <label className="text-sm">المسمى الوظيفي<input className="mt-1 block w-full rounded-input border border-brand-border bg-brand-lightGray/40 p-3" readOnly value={currentUser.jobTitleAr}/></label>
