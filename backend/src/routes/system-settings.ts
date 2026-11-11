@@ -21,8 +21,8 @@ router.get('/', async (_request, response) => {
 });
 
 router.put('/', async (request: AuthenticatedRequest, response) => {
-  if (request.authUser!.roleCode !== 'system_admin' || !request.permissions?.includes('manage_system_settings')) {
-    response.status(403).json({ message: 'إعدادات النظام متاحة لمدير النظام فقط.' });
+  if (!request.permissions?.includes('manage_system_settings')) {
+    response.status(403).json({ message: 'لا تملك صلاحية تعديل إعدادات المؤسسة والنظام.' });
     return;
   }
   const value = request.body?.settings;

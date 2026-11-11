@@ -144,7 +144,7 @@ export const Sidebar: React.FC = () => {
     { to: '/app/users', label: t.nav.users, icon: <Users className="w-5 h-5" />, roles: ['ADMIN', 'MANAGER', 'DEPUTY'], permission: 'manage_users' },
     { to: '/app/admin/account-types', label: 'أنواع الحسابات', icon: <PackageCheck className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
     { to: '/app/admin/workflow', label: 'إعداد سير العمل', icon: <Activity className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
-    { to: '/app/settings', label: t.nav.settings, icon: <Settings className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
+    { to: '/app/settings', label: t.nav.settings, icon: <Settings className="w-5 h-5" />, roles: ['ADMIN', 'MANAGER', 'DEPUTY', 'EMPLOYEE'], permission: 'manage_system_settings' },
     { to: '/app/admin/custom-fields', label: 'الخانات الإضافية', icon: <Database className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
     { to: '/app/audit-log', label: t.nav.audit, icon: <ShieldAlert className="w-5 h-5" />, roles: ['ADMIN'], permission: 'view_audit_log' },
     { to: '/app/system-health', label: t.nav.health, icon: <Activity className="w-5 h-5" />, roles: ['ADMIN'], permission: 'view_system_health' },
