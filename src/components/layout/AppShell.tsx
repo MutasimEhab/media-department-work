@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { EnglishDigits } from '../ui/EnglishDigits';
 import { WelcomeGreeting } from './WelcomeGreeting';
@@ -11,6 +11,7 @@ import { Toast } from '../ui/Toast';
 export const AppShell: React.FC = () => {
   const { isAuthenticated, isAuthLoading, theme, toasts, dismissToast, institutionLogo } = useApp();
   const location = useLocation();
+  const navigate = useNavigate();
   React.useEffect(() => {
     let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (!institutionLogo) { favicon?.remove(); return; }
@@ -28,7 +29,7 @@ export const AppShell: React.FC = () => {
       <EnglishDigits />
       <Topbar />
       <WelcomeGreeting />
-      <Toast toasts={toasts} onDismiss={dismissToast} />
+      <Toast toasts={toasts} onDismiss={dismissToast} onAction={(id, url) => { dismissToast(id); navigate(url); }} />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <div className="min-w-0 flex-1 overflow-y-auto">

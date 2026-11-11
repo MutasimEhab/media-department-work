@@ -125,6 +125,11 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
     const projectId = created.rows[0]!.id;
     await client.query('INSERT INTO project_members (project_id, user_id, added_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [projectId, ownerId, actor.id]);
     await client.query(
+      `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id, action_url)
+       VALUES ($1, 'PROJECT_ASSIGNED', 'مشروع جديد', $2, 'project', $3, $4)`,
+      [ownerId, `تم تكليفك بمسؤولية مشروع «${title}». افتح المشروع للاطلاع على التفاصيل والمراحل.`, projectId, `/app/projects/${projectId}`],
+    );
+    await client.query(
       `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
        VALUES ($1, 'project.create', 'projects', $2, $3::jsonb)`,
       [actor.id, projectId, JSON.stringify({ ownerId, title })],

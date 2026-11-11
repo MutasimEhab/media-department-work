@@ -1,11 +1,11 @@
-import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect, useRef } from 'react';
 import { User, Task, Project, Circular, WorkLog, NotificationItem, UserRole, WorkDateException } from '../types';
 import {
   MOCK_USERS,
 } from '../data/mockData';
 import { translations, Language } from '../i18n/translations';
 import { AppPermission, DEFAULT_ROLE_PERMISSIONS, roleHasPermission, RolePermissionOverrides } from '../auth/permissions';
-import { ToastItem, ToastType } from '../components/ui/Toast';
+import { ToastAction, ToastItem, ToastType } from '../components/ui/Toast';
 
 export type DisplayTheme = 'light' | 'dark';
 
@@ -21,7 +21,7 @@ interface AppContextType {
   isAuthLoading: boolean;
   welcomeGreetingOpen: boolean;
   dismissWelcomeGreeting: () => void;
-  notify: (message: string, type?: ToastType) => void;
+  notify: (message: string, type?: ToastType, action?: ToastAction) => void;
   dismissToast: (id: string) => void;
   toasts: ToastItem[];
   signOut: () => void;
@@ -141,11 +141,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const setInstitutionName = useCallback((name: string) => setInstitutionNameState(name), []);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const notificationBaseline = useRef<{ userId: string; initialized: boolean; ids: Set<string> }>({ userId: '', initialized: false, ids: new Set() });
   const dismissToast = useCallback((id: string) => setToasts(previous => previous.filter(item => item.id !== id)), []);
-  const notify = useCallback((message: string, type: ToastType = 'success') => {
+  const notify = useCallback((message: string, type: ToastType = 'success', action?: ToastAction) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setToasts(previous => [...previous.slice(-3), { id, type, message }]);
-    window.setTimeout(() => setToasts(previous => previous.filter(item => item.id !== id)), 5000);
+    setToasts(previous => [...previous.slice(-3), { id, type, message, title: action?.title, actionUrl: action?.url, actionLabel: action?.label }]);
+    window.setTimeout(() => setToasts(previous => previous.filter(item => item.id !== id)), action ? 10_000 : 5000);
   }, []);
   const dismissWelcomeGreeting = useCallback(() => setWelcomeGreetingOpen(false), []);
   useEffect(() => {
@@ -160,6 +162,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return savedUsers[0] || MOCK_USERS.find(user => user.id === 'U-002') || MOCK_USERS[0];
     } catch { return MOCK_USERS.find(user => user.id === 'U-002') || MOCK_USERS[0]; }
   });
+
+  const acceptNotifications = useCallback((incoming: NotificationItem[]) => {
+    const previous = notificationBaseline.current;
+    if (previous.userId !== currentUser.id || !previous.initialized) {
+      notificationBaseline.current = { userId: currentUser.id, initialized: true, ids: new Set(incoming.map(item => item.id)) };
+      setNotifications(incoming);
+      return;
+    }
+    const fresh = incoming.filter(item => !previous.ids.has(item.id) && !item.isRead);
+    notificationBaseline.current = { userId: currentUser.id, initialized: true, ids: new Set([...previous.ids, ...incoming.map(item => item.id)]) };
+    setNotifications(incoming);
+    fresh.slice(0, 3).forEach(item => notify(item.messageAr, 'info', {
+      title: item.titleAr,
+      url: item.actionUrl || '/app/notifications',
+      label: 'عرض الآن',
+    }));
+  }, [currentUser.id, notify]);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,7 +243,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const response = await fetch('/api/notifications', { credentials: 'include', cache: 'no-store' });
         if (!response.ok) return;
         const payload = await response.json() as { notifications?: NotificationItem[] };
-        if (!cancelled && payload.notifications) setNotifications(payload.notifications);
+        if (!cancelled && payload.notifications) acceptNotifications(payload.notifications);
       } catch { /* Keep the last saved notification list while offline. */ }
     };
     void refreshNotifications();
@@ -238,7 +257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onFocus);
     };
-  }, [isAuthenticated, currentUser.id]);
+  }, [isAuthenticated, currentUser.id, acceptNotifications]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -266,7 +285,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [circulars, setCirculars] = useState<Circular[]>([]);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [pendingWork, setPendingWork] = useState<WorkLog[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -308,12 +326,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (userResponse.ok && userPayload.users) setUsers(userPayload.users.map(mapBackendUser));
       if (projectResponse.ok && projectPayload.projects) setProjects(projectPayload.projects);
       if (circularResponse.ok && circularPayload.circulars) setCirculars(circularPayload.circulars);
-      if (notificationResponse.ok && notificationPayload.notifications) {
-        setNotifications(notificationPayload.notifications!);
-      }
+      if (notificationResponse.ok && notificationPayload.notifications) acceptNotifications(notificationPayload.notifications);
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [isAuthenticated, currentUser.id]);
+  }, [isAuthenticated, currentUser.id, acceptNotifications]);
 
   // The approved product interface is Arabic-only. Keep this compatibility
   // method for older components, but never switch the application locale.
@@ -563,7 +579,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const response = await fetch('/api/notifications', { credentials: 'include', cache: 'no-store' });
       if (response.ok) {
         const payload = await response.json() as { notifications?: NotificationItem[] };
-        if (payload.notifications) setNotifications(payload.notifications);
+        if (payload.notifications) acceptNotifications(payload.notifications);
       }
     } catch { /* Notification polling will refresh the list; assignment send already succeeded. */ }
     return { ok: true };
@@ -666,12 +682,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const notificationResponse = await fetch('/api/notifications', { credentials: 'include' });
           if (notificationResponse.ok) {
             const notificationPayload = await notificationResponse.json() as { notifications?: NotificationItem[] };
-            if (notificationPayload.notifications) {
-              setNotifications(previous => [
-                ...notificationPayload.notifications!,
-                ...previous.filter(item => item.userId !== currentUser.id || !notificationPayload.notifications!.some(saved => saved.id === item.id)),
-              ]);
-            }
+            if (notificationPayload.notifications) acceptNotifications(notificationPayload.notifications);
           }
         } catch { /* the published circular is already saved; notifications reload at next sign-in */ }
       }

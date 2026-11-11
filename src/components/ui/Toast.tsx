@@ -7,14 +7,20 @@ export interface ToastItem {
   id: string;
   type: ToastType;
   message: string;
+  title?: string;
+  actionUrl?: string;
+  actionLabel?: string;
 }
+
+export interface ToastAction { title?: string; url: string; label: string }
 
 export interface ToastProps {
   toasts: ToastItem[];
   onDismiss: (id: string) => void;
+  onAction?: (id: string, url: string) => void;
 }
 
-export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
+export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss, onAction }) => {
   if (toasts.length === 0) return null;
 
   const typeConfig: Record<ToastType, { icon: React.ReactNode; bg: string; text: string; border: string }> = {
@@ -56,14 +62,18 @@ export const Toast: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
             key={toast.id}
             role={toast.type === 'error' ? 'alert' : 'status'}
             className={`
-              pointer-events-auto flex items-center justify-between gap-3 p-4 rounded-card border shadow-dialog
+              pointer-events-auto flex items-start justify-between gap-3 p-4 rounded-card border shadow-dialog
               ${conf.bg} ${conf.text} ${conf.border}
               animate-in slide-in-from-bottom-4 duration-150
             `}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               {conf.icon}
-              <span className="text-sm font-medium">{toast.message}</span>
+              <div className="min-w-0">
+                {toast.title && <p className="mb-1 text-sm font-bold">{toast.title}</p>}
+                <p className="text-sm font-medium">{toast.message}</p>
+                {toast.actionUrl && toast.actionLabel && <button type="button" onClick={() => onAction?.(toast.id, toast.actionUrl!)} className="mt-2 rounded-md bg-brand-plum px-3 py-1.5 text-xs font-bold text-white hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-brand-plum">{toast.actionLabel}</button>}
+              </div>
             </div>
             <button
               type="button"
