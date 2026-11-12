@@ -27,6 +27,7 @@ import { AppProvider } from './context/AppContext';
 import { AppShell } from './components/layout/AppShell';
 import { PermissionGuard } from './components/guards/PermissionGuard';
 import { useApp } from './context/AppContext';
+import { EnglishDigits } from './components/ui/EnglishDigits';
 
 const AppHome: React.FC = () => {
   const { currentUser } = useApp();
@@ -36,6 +37,7 @@ const AppHome: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <AppProvider>
+      <EnglishDigits />
       <BrowserRouter>
         <Routes>
           {/* Root redirect to App */}
