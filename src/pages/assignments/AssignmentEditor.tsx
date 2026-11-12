@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -10,15 +10,8 @@ import { Task, TaskPriority, TaskType } from '../../types';
 
 const timeInput = (deadline?: string) => {
   const match = deadline?.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-  if (!match) return '17:00';
-  let hour = Number(match[1]) % 12;
-  if (match[3]!.toUpperCase() === 'PM') hour += 12;
-  return `${String(hour).padStart(2, '0')}:${match[2]}`;
-};
-const storedTime = (time: string) => {
-  const [rawHour, minute] = time.split(':');
-  const hour = Number(rawHour);
-  return `${String(hour % 12 || 12).padStart(2, '0')}:${minute} ${hour >= 12 ? 'PM' : 'AM'}`;
+  if (!match) return { hour: '05', minute: '00', period: 'PM' as const };
+  return { hour: String(Number(match[1])).padStart(2, '0'), minute: match[2]!, period: match[3]!.toUpperCase() as 'AM'|'PM' };
 };
 const tomorrowInGaza = (date: string) => {
   const [year, month, day] = date.split('-').map(Number);
@@ -36,14 +29,11 @@ export const AssignmentEditor: React.FC = () => {
   const [titleAr, setTitleAr] = useState(base?.titleAr || '');
   const [descriptionAr, setDescriptionAr] = useState(base?.descriptionAr || '');
   const [priority, setPriority] = useState<TaskPriority>(base?.priority || 'MEDIUM');
-  const [type, setType] = useState<TaskType>(base?.type || 'NORMAL');
+  const [type, setType] = useState<TaskType | ''>(base?.type || '');
   const [deadline, setDeadline] = useState(base?.deadline.split(' ')[0] || tomorrowInGaza(today));
-  const [time, setTime] = useState(timeInput(base?.deadline));
+  const [time, setTime] = useState(() => timeInput(base?.deadline));
   const [assignees, setAssignees] = useState<string[]>(base?.recipients.map(recipient => recipient.userId) || []);
-  const [referenceUrl, setReferenceUrl] = useState(base?.referenceUrl || '');
-  const [email, setEmail] = useState(base?.emailDelivery || false);
-  const [sms, setSms] = useState(base?.smsDelivery || false);
-  const [reminders, setReminders] = useState(base?.reminderOptions || ['24h', '2h', 'daily']);
+  const [typeNames, setTypeNames] = useState({ normal: 'عادي', socialMedia: 'وسائل التواصل الاجتماعي' });
   const [error, setError] = useState('');
   const [serverError, setServerError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -51,7 +41,15 @@ export const AssignmentEditor: React.FC = () => {
   const activeUsers = users.filter(user => user.role === 'EMPLOYEE' && user.isActive);
   const recipientOptions = activeUsers.map(user => ({ value: user.id, label: `${ar ? user.arabicName : user.englishName} · ${ar ? user.jobTitleAr : user.jobTitleEn}` }));
   const minDate = tomorrowInGaza(today);
-  const urlIsValid = !referenceUrl || /^https:\/\/drive\.google\.com\//.test(referenceUrl.trim());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/system-settings', { credentials: 'include' })
+      .then(async response => response.ok ? response.json() as Promise<{settings?:{assignmentTypeNames?:{normal?:string;socialMedia?:string}}}> : null)
+      .then(payload => { if (!cancelled && payload?.settings?.assignmentTypeNames) setTypeNames(current => ({ ...current, ...payload.settings!.assignmentTypeNames })); })
+      .catch(() => { /* Labels have readable defaults when settings are unavailable. */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const makeTask = (isDraft: boolean): Task => ({
     id: base?.id || `TSK-${106 + tasks.filter(task => /^TSK-\d+$/.test(task.id)).length - 5}`,
@@ -63,15 +61,12 @@ export const AssignmentEditor: React.FC = () => {
     creatorNameAr: currentUser.arabicName,
     creatorNameEn: currentUser.englishName,
     priority,
-    type,
-    deadline: `${deadline} ${storedTime(time)}`,
+    type: type || 'NORMAL',
+    deadline: `${deadline} ${time.hour}:${time.minute} ${time.period}`,
     createdAt: new Date().toISOString(),
     isDraft,
     projectId: base?.projectId,
-    referenceUrl: referenceUrl.trim() || undefined,
-    reminderOptions: reminders,
-    emailDelivery: email,
-    smsDelivery: sms,
+    reminderOptions: [],
     recipients: assignees.map(userId => {
       const user = users.find(candidate => candidate.id === userId)!;
       const previous = base?.recipients.find(recipient => recipient.userId === userId);
@@ -89,8 +84,7 @@ export const AssignmentEditor: React.FC = () => {
     if (!titleAr.trim()) { setError('title'); return false; }
     if (send && !descriptionAr.trim()) { setError('description'); return false; }
     if (deadline < minDate) { setError('date'); return false; }
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time.trim())) { setError('time'); return false; }
-    if (!urlIsValid) { setError('url'); return false; }
+    if (!/^(0[1-9]|1[0-2])$/.test(time.hour) || !/^[0-5]\d$/.test(time.minute)) { setError('time'); return false; }
     if (send && !assignees.length) { setError('assignees'); return false; }
     return true;
   }
@@ -123,26 +117,17 @@ export const AssignmentEditor: React.FC = () => {
           <TextField label={tx('عنوان التكليف','Assignment title')} value={titleAr} onChange={event => setTitleAr(event.target.value)} dir="rtl" requiredIndicator helperText={tx('اكتب العنوان بالعربية.','Enter the title in Arabic.')}/>
           <Textarea label={tx('وصف التكليف','Assignment description')} value={descriptionAr} onChange={event => setDescriptionAr(event.target.value)} dir="rtl" rows={3} helperText={tx('اكتب الوصف بالعربية.','Enter the description in Arabic.')}/>
           <label className="text-sm">{tx('الأولوية','Priority')}<select className="block w-full border rounded p-3 mt-1" value={priority} onChange={event => setPriority(event.target.value as TaskPriority)}>{[['LOW','منخفضة','Low'],['MEDIUM','متوسطة','Medium'],['HIGH','عالية','High'],['URGENT','عاجل','Urgent']].map(([value, arabic, english])=><option key={value} value={value}>{tx(arabic,english)}</option>)}</select></label>
-          <label className="text-sm">{tx('نوع التكليف','Assignment kind')}<select className="block w-full border rounded p-3 mt-1" value={type} onChange={event => setType(event.target.value as TaskType)}><option value="NORMAL">{tx('عادي','Normal')}</option><option value="SOCIAL_MEDIA">{tx('وسائل التواصل الاجتماعي','Social media')}</option></select></label>
+          <fieldset className="text-sm"><legend>{tx('نوع التكليف (اختياري)','Assignment type (optional)')}</legend><div className="mt-2 flex flex-wrap gap-3">{([['NORMAL',typeNames.normal],['SOCIAL_MEDIA',typeNames.socialMedia]] as const).map(([value,label])=><label key={value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-brand-border px-3 py-2"><input type="checkbox" checked={type===value} onChange={event=>setType(event.target.checked?value:type===value?'':type)}/>{label}</label>)}</div><p className="mt-1 text-xs text-brand-charcoal">{tx('يمكن ترك النوع دون تحديد أو اختيار نوع واحد.','Leave unselected or choose one type.')}</p></fieldset>
         </div>
       </Card>
 
       <Card title={tx('2. الموعد والمستلمون','2. Deadline and recipients')}>
-        <div className="grid gap-4 sm:grid-cols-2"><TextField label={tx('تاريخ الاستحقاق','Due date')} type="date" dir="ltr" min={minDate} value={deadline} onChange={event => setDeadline(event.target.value)} requiredIndicator/><TextField label="وقت الاستحقاق" type="time" dir="ltr" value={time} onChange={event => setTime(event.target.value)} requiredIndicator/></div>
+        <div className="grid gap-4 sm:grid-cols-2"><TextField label={tx('تاريخ الاستحقاق','Due date')} type="date" dir="ltr" min={minDate} value={deadline} onChange={event => setDeadline(event.target.value)} requiredIndicator/><fieldset><legend className="text-sm">{tx('وقت الاستحقاق (12 ساعة)','Due time (12-hour)')}</legend><div className="mt-1 flex gap-2" dir="ltr"><select aria-label="Hour" className="min-w-0 flex-1 rounded border p-3" value={time.hour} onChange={event=>setTime(current=>({...current,hour:event.target.value}))}>{Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')).map(hour=><option key={hour}>{hour}</option>)}</select><span className="self-center">:</span><select aria-label="Minute" className="min-w-0 flex-1 rounded border p-3" value={time.minute} onChange={event=>setTime(current=>({...current,minute:event.target.value}))}>{Array.from({length:60},(_,i)=>String(i).padStart(2,'0')).map(minute=><option key={minute}>{minute}</option>)}</select><select aria-label="AM or PM" className="rounded border p-3" value={time.period} onChange={event=>setTime(current=>({...current,period:event.target.value as 'AM'|'PM'}))}><option value="AM">AM</option><option value="PM">PM</option></select></div></fieldset></div>
         <p className="text-xs mt-2">{tx(`أقرب تاريخ متاح: ${minDate} (بعد تاريخ اليوم ${today}).`, `Earliest allowed date: ${minDate} (after today ${today}).`)}</p>
         <div className="mt-4"><MultiSelect label={tx('الموظفون المكلفون','Assigned employees')} options={recipientOptions} value={assignees} onChange={setAssignees} requiredIndicator/><div className="flex flex-wrap gap-2 mt-3">{assignees.map(userId=>{const user=users.find(candidate=>candidate.id===userId);return user?<span className="rounded-full bg-brand-lightGray px-3 py-1 text-sm" key={userId}>{ar?user.arabicName:user.englishName}</span>:null})}</div></div>
       </Card>
 
-      <Card title={tx('3. المراجع والتنبيهات','3. References and reminders')}>
-        <TextField label={tx('رابط Google Drive مرجعي (اختياري)','Reference Google Drive URL (optional)')} type="url" dir="ltr" value={referenceUrl} onChange={event => setReferenceUrl(event.target.value)} helperText={tx('رابط Google Drive فقط، لا رفع للملفات.','Google Drive links only; no file uploads.')}/>
-        <p className="font-bold mt-4">{tx('التذكيرات','Reminders')}</p>
-        <div className="flex flex-wrap gap-4 mt-2">{[['24h',tx('قبل 24 ساعة','24 hours before')],['2h',tx('قبل ساعتين','2 hours before')],['daily',tx('يومياً بعد التأخير','Daily when overdue')]].map(([value,label])=><label key={value} className="flex items-center gap-2"><input type="checkbox" checked={reminders.includes(value)} onChange={event=>setReminders(current=>event.target.checked?[...current,value]:current.filter(item=>item!==value))}/>{label}</label>)}</div>
-        <p className="font-bold mt-4">{tx('قنوات التوصيل الاختيارية','Optional delivery channels')}</p>
-        <div className="flex flex-wrap gap-4 mt-2"><label><input type="checkbox" checked={email} onChange={event=>setEmail(event.target.checked)}/> Email · {tx('محاكاة فقط','simulated only')}</label><label><input type="checkbox" checked={sms} onChange={event=>setSms(event.target.checked)}/> SMS · {tx('محاكاة فقط','simulated only')}</label></div>
-        <p className="text-sm mt-2">{tx('الإشعارات الداخلية مفعّلة دائماً. البريد وSMS لا يرسلان فعلياً.','Internal notifications are always on. Email and SMS are not actually sent.')}</p>
-      </Card>
-
-      {error&&<p role="alert" className="p-3 border-s-4 border-brand-plum">{({title:'أدخل عنوان التكليف بالعربية.',description:'أدخل وصف التكليف بالعربية قبل الإرسال.',date:'اختر موعدًا مستقبليًا بعد تاريخ اليوم.',time:'اختر وقتاً صحيحاً للاستحقاق.',url:'يجب أن يبدأ الرابط بـ https://drive.google.com/.',assignees:'اختر موظفًا واحدًا على الأقل.'} as Record<string,string>)[error]}</p>}
+      {error&&<p role="alert" className="p-3 border-s-4 border-brand-plum">{({title:'أدخل عنوان التكليف بالعربية.',description:'أدخل وصف التكليف بالعربية قبل الإرسال.',date:'اختر موعدًا مستقبليًا بعد تاريخ اليوم.',time:'اختر وقتاً صحيحاً للاستحقاق.',assignees:'اختر موظفًا واحدًا على الأقل.'} as Record<string,string>)[error]}</p>}
       {serverError&&<p role="alert" className="p-3 border-s-4 border-red-600">{serverError}</p>}
       <div className="flex flex-wrap gap-3"><Button type="button" variant="outline" isLoading={busy} disabled={busy} onClick={()=>submit(false)}>{tx('حفظ كمسودة','Save draft')}</Button><Button type="button" isLoading={busy} disabled={busy} onClick={()=>submit(true)}>{tx('إرسال التكليف','Send assignment')}</Button><Button type="button" variant="ghost" onClick={()=>navigate('/app/assignments')}>{tx('إلغاء','Cancel')}</Button></div>
     </form>

@@ -10,6 +10,7 @@ type Settings = {
   startTime: string; endTime: string; weights: { completion: number; timeliness: number; communication: number };
   taskReminderHours: number[]; missingWorkAlertsEnabled: boolean; missingWorkAlertTime: string;
   smsNotificationsEnabled: boolean; sessionMinutes: number; language: 'ar'; organizationLogo?: string | null;
+  assignmentTypeNames: { normal: string; socialMedia: string };
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -20,6 +21,7 @@ const DEFAULT_SETTINGS: Settings = {
   weights: { completion: 40, timeliness: 40, communication: 20 },
   taskReminderHours: [24, 2], missingWorkAlertsEnabled: true, missingWorkAlertTime: '15:00',
   smsNotificationsEnabled: false, sessionMinutes: 30, language: 'ar', organizationLogo: null,
+  assignmentTypeNames: { normal: 'عادي', socialMedia: 'وسائل التواصل الاجتماعي' },
 };
 
 const ROLES: { id: UserRole; label: string }[] = [
@@ -39,7 +41,7 @@ export const SystemSettings: React.FC = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingRolePermission, setSavingRolePermission] = useState(false);
   const [error, setError] = useState('');
-  const [section, setSection] = useState<'organization'|'work'|'scoring'|'reminders'|'security'|'permissions'>('organization');
+  const [section, setSection] = useState<'organization'|'work'|'scoring'|'reminders'|'security'|'permissions'|'assignmentTypes'>('organization');
   const weightTotal = settings.weights.completion + settings.weights.timeliness + settings.weights.communication;
 
   useEffect(() => { setSaved(false); }, [settings]);
@@ -51,7 +53,11 @@ export const SystemSettings: React.FC = () => {
         const payload = await response.json() as { settings?: Partial<Settings> | null; message?: string };
         if (!response.ok) throw new Error(payload.message || 'تعذر تحميل الإعدادات.');
         if (!cancelled && payload.settings) {
-          const merged = { ...DEFAULT_SETTINGS, ...payload.settings, weights: { ...DEFAULT_SETTINGS.weights, ...payload.settings.weights } };
+          const merged = {
+            ...DEFAULT_SETTINGS, ...payload.settings,
+            weights: { ...DEFAULT_SETTINGS.weights, ...payload.settings.weights },
+            assignmentTypeNames: { ...DEFAULT_SETTINGS.assignmentTypeNames, ...payload.settings.assignmentTypeNames },
+          };
           setSettings(merged);
           setInstitutionLogo(String(merged.organizationLogo || ''));
           try { localStorage.setItem('official_system_settings', JSON.stringify(merged)); } catch { /* the database remains authoritative */ }
@@ -111,6 +117,7 @@ export const SystemSettings: React.FC = () => {
   const tabs = [
     ['organization','بيانات المؤسسة'], ['work','الدوام وساعات العمل'],
     ['scoring','معايير التقييم'], ['reminders','التنبيهات'], ['security','الأمان والجلسات'], ['permissions','مصفوفة الصلاحيات'],
+    ['assignmentTypes','أنواع التكليفات'],
   ] as const;
 
   return <main className="mx-auto max-w-6xl space-y-5" dir="rtl">
@@ -123,7 +130,7 @@ export const SystemSettings: React.FC = () => {
       {tabs.map(([id,label]) => <Button key={id} size="sm" variant={section===id?'secondary':'outline'} onClick={()=>setSection(id)}>{label}</Button>)}
     </nav>
 
-    {section === 'permissions' ? <>
+    {section === 'assignmentTypes' ? <form onSubmit={saveSettings} className="space-y-4"><Card title="خيارات نوع التكليف"><p className="mb-4 text-sm text-brand-charcoal">عدّل اسمي الخيارين اللذين يظهران كمربعي اختيار في نموذج التكليف. اختيار النوع اختياري.</p><div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-semibold">اسم الخيار الأول<input className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" maxLength={60} value={settings.assignmentTypeNames.normal} onChange={e=>setSettings(s=>({...s,assignmentTypeNames:{...s.assignmentTypeNames,normal:e.target.value}}))}/></label><label className="text-sm font-semibold">اسم الخيار الثاني<input className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" maxLength={60} value={settings.assignmentTypeNames.socialMedia} onChange={e=>setSettings(s=>({...s,assignmentTypeNames:{...s.assignmentTypeNames,socialMedia:e.target.value}}))}/></label></div></Card>{error&&<p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}{saved&&<p role="status" className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800">تم حفظ أنواع التكليفات.</p>}<div className="flex gap-2"><Button type="submit" disabled={savingSettings||loadingSettings}>{savingSettings?'جارٍ الحفظ…':'حفظ أسماء الأنواع'}</Button></div></form> : section === 'permissions' ? <>
       <Card title="مصفوفة الصلاحيات حسب الدور">
         <p className="mb-4 text-sm text-brand-charcoal">تُحفظ التغييرات في قاعدة البيانات ويطبقها الخادم على طلبات الحسابات. تعديل المصفوفة متاح لمدير النظام فقط، وصلاحياته ثابتة لضمان بقاء إدارة النظام متاحة.</p>
         <div className="overflow-x-auto">

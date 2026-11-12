@@ -111,7 +111,8 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
   const title = typeof body.titleAr === 'string' ? body.titleAr.trim() : '';
   const description = typeof body.descriptionAr === 'string' ? body.descriptionAr.trim() : '';
   const priority = typeof body.priority === 'string' ? body.priority.toLowerCase() : '';
-  const kind = body.type === 'SOCIAL_MEDIA' ? 'social_media' : body.type === 'NORMAL' ? 'normal' : '';
+  // Type is optional; retain the legacy database default when no checkbox is selected.
+  const kind = body.type === 'SOCIAL_MEDIA' ? 'social_media' : 'normal';
   const draft = body.isDraft === true;
   const deadline = parseDeadline(body.deadline);
   const assigneeIds = Array.isArray(body.assigneeIds)
@@ -123,15 +124,16 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
     : [];
 
   if (!title || title.length > 200 || (!draft && !description) || description.length > 10000
-    || !['low', 'medium', 'high', 'urgent'].includes(priority) || !kind || !deadline
+    || !['low', 'medium', 'high', 'urgent'].includes(priority) || !deadline
     || (!draft && assigneeIds.length === 0)
     || (referenceUrl && !/^https:\/\/drive\.google\.com\//.test(referenceUrl))) {
     response.status(400).json({ message: 'تحقق من العنوان والوصف والأولوية والموعد والمستلمين ورابط Google Drive.' });
     return;
   }
 
-  const client = await db.connect();
+  let client: import('pg').PoolClient | undefined;
   try {
+    client = await db.connect();
     await client.query('BEGIN');
     let departmentId = actor.departmentId;
     if (assigneeIds.length) {
@@ -233,10 +235,21 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
     await client.query('COMMIT');
     response.status(id ? 200 : 201).json({ task: mapRows(saved.rows)[0] });
   } catch (error) {
-    await client.query('ROLLBACK');
-    response.status(503).json({ message: 'تعذر حفظ التكليف في قاعدة البيانات.' });
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch { /* Preserve the original database error. */ }
+    }
+    console.error('Failed to save assignment:', error);
+    const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
+    const message = code === '23503'
+      ? 'تعذر حفظ التكليف بسبب ارتباط أحد الموظفين أو الدائرة؛ حدّث الصفحة وأعد اختيار المستلمين.'
+      : code === '23514'
+        ? 'تعذر حفظ التكليف بسبب قيمة غير مقبولة في قاعدة البيانات؛ راجع إعدادات قاعدة البيانات.'
+        : code === '42703' || code === '42P01'
+          ? 'قاعدة البيانات تحتاج إلى تحديث مخطط التكليفات؛ شغّل ترحيلات قاعدة البيانات ثم أعد المحاولة.'
+          : 'تعذر حفظ التكليف في قاعدة البيانات. سُجل سبب الخطأ لفحصه من سجلات الخادم.';
+    response.status(503).json({ message });
   } finally {
-    client.release();
+    client?.release();
   }
 }
 

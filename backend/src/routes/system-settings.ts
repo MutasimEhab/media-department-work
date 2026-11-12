@@ -39,6 +39,9 @@ router.put('/', async (request: AuthenticatedRequest, response) => {
     && value.smsNotificationsEnabled === false
     && Number.isInteger(value.sessionMinutes) && value.sessionMinutes >= 5 && value.sessionMinutes <= 240
     && value.language === 'ar'
+    && (value.assignmentTypeNames === undefined || (value.assignmentTypeNames
+      && typeof value.assignmentTypeNames.normal === 'string' && value.assignmentTypeNames.normal.trim().length > 0 && value.assignmentTypeNames.normal.length <= 60
+      && typeof value.assignmentTypeNames.socialMedia === 'string' && value.assignmentTypeNames.socialMedia.trim().length > 0 && value.assignmentTypeNames.socialMedia.length <= 60))
     && (value.organizationLogo === undefined || value.organizationLogo === null
       || (typeof value.organizationLogo === 'string'
         && value.organizationLogo.length <= 500_000
