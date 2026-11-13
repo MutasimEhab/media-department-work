@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/index.js",
     "db:migrate": "npm run build && node dist/scripts/migrate.js",
+    "db:migrate:production": "node dist/scripts/migrate-on-production.js",
     "admin:create": "npm run build && node dist/scripts/create-initial-admin.js"
   },
   "dependencies": {
