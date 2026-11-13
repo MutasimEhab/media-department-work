@@ -8,7 +8,7 @@ import { WelcomeGreeting } from './WelcomeGreeting';
 import { Toast } from '../ui/Toast';
 
 export const AppShell: React.FC = () => {
-  const { isAuthenticated, isAuthLoading, theme, toasts, dismissToast, institutionLogo } = useApp();
+  const { isAuthenticated, isAuthLoading, theme, toasts, dismissToast, institutionLogo, markNotificationAsRead } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   React.useEffect(() => {
@@ -39,7 +39,7 @@ export const AppShell: React.FC = () => {
     <div className={`${theme === 'dark' ? 'app-theme-dark' : 'app-theme-light'} min-h-screen bg-brand-lightGray text-brand-darkText flex flex-col`}>
       <Topbar />
       <WelcomeGreeting />
-      <Toast toasts={toasts} onDismiss={dismissToast} onAction={(id, url) => { dismissToast(id); navigate(url); }} />
+      <Toast toasts={toasts} onDismiss={dismissToast} onAction={(id, url, notificationId) => { dismissToast(id); if (notificationId) void markNotificationAsRead(notificationId, { quiet: true }); navigate(url); }} />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <div className="min-w-0 flex-1 overflow-y-auto">

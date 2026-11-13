@@ -44,7 +44,7 @@ interface AppContextType {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
-  markNotificationAsRead: (id: string) => Promise<void>;
+  markNotificationAsRead: (id: string, options?: { quiet?: boolean }) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
   acknowledgeCircular: (circularId: string, userId: string) => Promise<{ ok: boolean; message?: string }>;
   addWorkLog: (log: Omit<WorkLog, 'id'>) => Promise<{ ok: boolean; message?: string }>;
@@ -146,7 +146,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const dismissToast = useCallback((id: string) => setToasts(previous => previous.filter(item => item.id !== id)), []);
   const notify = useCallback((message: string, type: ToastType = 'success', action?: ToastAction) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setToasts(previous => [...previous.slice(-3), { id, type, message, title: action?.title, actionUrl: action?.url, actionLabel: action?.label }]);
+    setToasts(previous => [...previous.slice(-3), {
+      id, type, message, title: action?.title, actionUrl: action?.url, actionLabel: action?.label,
+      notificationType: action?.notificationType, notificationId: action?.notificationId,
+    }]);
     window.setTimeout(() => setToasts(previous => previous.filter(item => item.id !== id)), action ? 10_000 : 5000);
   }, []);
   const dismissWelcomeGreeting = useCallback(() => setWelcomeGreetingOpen(false), []);
@@ -176,7 +179,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fresh.slice(0, 3).forEach(item => notify(item.messageAr, 'info', {
       title: item.titleAr,
       url: item.actionUrl || '/app/notifications',
-      label: 'عرض الآن',
+      label: 'عرض التفاصيل',
+      notificationType: item.type,
+      notificationId: item.id,
     }));
   }, [currentUser.id, notify]);
 
@@ -247,7 +252,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch { /* Keep the last saved notification list while offline. */ }
     };
     void refreshNotifications();
-    const interval = window.setInterval(() => void refreshNotifications(), 15_000);
+    const interval = window.setInterval(() => void refreshNotifications(), 5_000);
     const onFocus = () => void refreshNotifications();
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);
@@ -389,7 +394,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const userNotifications = notifications.filter(n => n.userId === currentUser.id);
   const unreadNotificationCount = userNotifications.filter(n => !n.isRead).length;
 
-  const markNotificationAsRead = async (id: string) => {
+  const markNotificationAsRead = async (id: string, options?: { quiet?: boolean }) => {
     const notification = notifications.find(item => item.id === id && item.userId === currentUser.id);
     if (!notification) return;
     if (!notification.id.startsWith('NTF-')) {
@@ -402,7 +407,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     setNotifications(prev => prev.map(item => item.id === id ? { ...item, isRead: true } : item));
-    notify('تم تحديث حالة الإشعار.', 'success');
+    if (!options?.quiet) notify('تم تحديث حالة الإشعار.', 'success');
   };
 
   const markAllNotificationsAsRead = async () => {

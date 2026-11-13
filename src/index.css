@@ -438,6 +438,15 @@ html.app-theme-dark ::-webkit-scrollbar-thumb:hover { background: #777d8b; }
 }
 
 /* Match the supplied split login composition while retaining the existing flows. */
+.notification-toast-progress {
+  transform-origin: right center;
+  animation: notification-toast-countdown 10s linear forwards;
+}
+@keyframes notification-toast-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
 .auth-page > div {
   width: 100%;
   min-height: min(720px, calc(100vh - 64px));

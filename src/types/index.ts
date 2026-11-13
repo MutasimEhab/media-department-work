@@ -145,7 +145,7 @@ export interface WorkLog {
   isException?: boolean;
 }
 
-export type NotificationType = 'TASK_ASSIGNED' | 'TASK_SUBMITTED' | 'PROJECT_ASSIGNED' | 'CIRCULAR_PUBLISHED' | 'TASK_AWAITING_REVIEW' | 'WORK_LOG_MISSING';
+export type NotificationType = 'TASK_ASSIGNED' | 'TASK_SUBMITTED' | 'PROJECT_ASSIGNED' | 'CIRCULAR_PUBLISHED' | 'TASK_AWAITING_REVIEW' | 'WORK_LOG_MISSING' | 'WORK_DATE_EXCEPTION';
 
 export interface NotificationItem {
   id: string; // NTF-501

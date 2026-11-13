@@ -128,8 +128,8 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
       const entry = created.rows[0];
       if (!entry) throw new Error('Exception insert returned no row.');
       await client.query(
-        `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id)
-         VALUES ($1, 'WORK_DATE_EXCEPTION', 'اعتماد استثناء تاريخ عمل', $2, 'work_date_exception', $3)`,
+        `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id, action_url)
+         VALUES ($1, 'WORK_DATE_EXCEPTION', 'اعتماد استثناء تاريخ عمل', $2, 'work_date_exception', $3, '/app/my-exceptions')`,
         [target.id, `تم اعتماد تسجيل العمل عن تاريخ ${workDate}، حتى ${expiresAt.toLocaleString('ar-PS', { timeZone: 'Asia/Gaza', dateStyle: 'medium', timeStyle: 'short', hour12: true, numberingSystem: 'latn' })}. السبب: ${reason}`, entry.id],
       );
       await client.query(
