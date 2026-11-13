@@ -327,6 +327,10 @@ html.app-theme-dark body {
 .app-theme-dark input[type="radio"] { accent-color: #c80893; }
 .app-theme-dark table tbody tr { border-color: var(--app-border); }
 .app-theme-dark .app-page-heading { background: var(--app-surface); border-color: var(--app-border); }
+.app-theme-dark .app-page-heading p {
+  color: #d6d8e0 !important;
+  font-weight: 500;
+}
 .app-theme-dark header.sticky { background: var(--app-surface) !important; border-color: var(--app-border) !important; }
 .app-theme-dark [class*="text-brand-charcoal/"],
 .app-theme-dark [class*="text-gray-4"],
