@@ -173,13 +173,16 @@ h1, h2, h3 {
 
 /* Application surfaces follow the supplied dark institutional UI references. */
 .app-theme-dark {
-  --app-bg: #171219;
-  --app-surface: #211a24;
-  --app-raised: #2b202e;
-  --app-border: #4b354f;
-  --app-text: #f3eaf3;
-  --app-muted: #d0c2d2;
-  --app-pink: #ef80d1;
+  --app-bg: #111216;
+  --app-surface: #191a20;
+  --app-raised: #20212a;
+  --app-raised-hover: #282a34;
+  --app-border: #373944;
+  --app-text: #f4f4f7;
+  --app-muted: #b8bbc6;
+  --app-pink: #f08acc;
+  --app-plum: #cf79b5;
+  --app-shadow: 0 8px 24px rgba(0, 0, 0, .24);
   color-scheme: dark;
   background: var(--app-bg) !important;
   color: var(--app-text) !important;
@@ -200,6 +203,13 @@ h1, h2, h3 {
 
 .app-theme-dark,
 .app-theme-light { transition: background-color 180ms ease, color 180ms ease; }
+
+html.app-theme-dark,
+html.app-theme-dark body {
+  background: var(--app-bg) !important;
+  color: var(--app-text);
+  color-scheme: dark;
+}
 
 .app-theme-dark [class~="bg-white"] { background-color: var(--app-surface) !important; }
 .app-theme-dark [class~="bg-brand-lightGray"] { background-color: var(--app-bg) !important; }
@@ -279,6 +289,9 @@ h1, h2, h3 {
 .app-theme-dark [class~="text-blue-700"] { color: #bfdbfe !important; }
 .app-theme-dark [class~="text-brand-plum"],
 .app-theme-dark [class~="text-brand-magenta"] { color: var(--app-pink) !important; }
+.app-theme-dark [class~="text-brand-plum/70"],
+.app-theme-dark [class~="text-brand-plum/80"],
+.app-theme-dark [class~="text-brand-magenta/70"] { color: var(--app-pink) !important; }
 .app-theme-dark [class~="border-brand-border"],
 .app-theme-dark [class~="border-brand-border/60"],
 .app-theme-dark [class~="border-brand-border/50"],
@@ -299,17 +312,18 @@ h1, h2, h3 {
 .app-theme-dark input:not([type="checkbox"]):not([type="radio"]),
 .app-theme-dark select,
 .app-theme-dark textarea {
-  background-color: #1b151e;
+  background-color: #15161b;
   border-color: var(--app-border);
   color: var(--app-text);
+  caret-color: var(--app-pink);
 }
 .app-theme-dark input::placeholder,
-.app-theme-dark textarea::placeholder { color: #a999ac; opacity: 1; }
+.app-theme-dark textarea::placeholder { color: #aeb1bc; opacity: 1; }
 .app-theme-dark input[type="checkbox"],
 .app-theme-dark input[type="radio"] { accent-color: #c80893; }
 .app-theme-dark table tbody tr { border-color: var(--app-border); }
 .app-theme-dark .app-page-heading { background: var(--app-surface); border-color: var(--app-border); }
-.app-theme-dark header.sticky { background: #1b151e !important; border-color: var(--app-border) !important; }
+.app-theme-dark header.sticky { background: var(--app-surface) !important; border-color: var(--app-border) !important; }
 .app-theme-dark [class*="text-brand-charcoal/"],
 .app-theme-dark [class*="text-gray-4"],
 .app-theme-dark [class*="text-gray-5"],
@@ -337,12 +351,46 @@ h1, h2, h3 {
 .app-theme-dark [class~="bg-zinc-200"],
 .app-theme-dark [class~="bg-stone-200"] { background-color: var(--app-raised) !important; }
 .app-theme-dark [class~="text-brand-darkText/70"],
-.app-theme-dark [class~="text-brand-darkText/80"] { color: var(--app-muted) !important; }
+.app-theme-dark [class~="text-brand-darkText/50"],
+.app-theme-dark [class~="text-brand-darkText/60"],
+.app-theme-dark [class~="text-brand-darkText/70"],
+.app-theme-dark [class~="text-brand-darkText/80"],
+.app-theme-dark [class~="text-brand-darkText/90"] { color: var(--app-muted) !important; }
 .app-theme-dark option { background: var(--app-surface); color: var(--app-text); }
 .app-theme-dark a:not([class*="text-"]) { color: var(--app-pink); }
 
+/* Refined dark surfaces: neutral charcoal layers, clear edges, and restrained brand accents. */
+.app-theme-dark [class~="bg-white"],
+.app-theme-dark [class~="bg-brand-surface"] { background-color: var(--app-surface) !important; }
+.app-theme-dark [class~="bg-brand-lightGray/30"],
+.app-theme-dark [class~="bg-brand-lightGray/40"],
+.app-theme-dark [class~="bg-brand-lightGray/50"],
+.app-theme-dark [class~="bg-brand-lightGray/60"],
+.app-theme-dark [class~="bg-brand-lightGray/80"],
+.app-theme-dark [class~="bg-gray-200"],
+.app-theme-dark [class~="bg-slate-300"],
+.app-theme-dark [class~="bg-neutral-200"],
+.app-theme-dark [class~="bg-zinc-200"],
+.app-theme-dark [class~="bg-stone-200"] { background-color: var(--app-raised) !important; }
+.app-theme-dark [class~="hover:bg-brand-lightGray/30"]:hover,
+.app-theme-dark [class~="hover:bg-brand-lightGray/40"]:hover,
+.app-theme-dark [class~="hover:bg-brand-lightGray/50"]:hover,
+.app-theme-dark [class~="hover:bg-gray-50"]:hover { background-color: var(--app-raised-hover) !important; }
+.app-theme-dark [class~="shadow-subtle"],
+.app-theme-dark [class~="shadow-card"] { box-shadow: var(--app-shadow) !important; }
+.app-theme-dark [class~="border-brand-border/70"],
+.app-theme-dark [class~="divide-brand-border/60"] > :not([hidden]) ~ :not([hidden]) { border-color: var(--app-border) !important; }
+.app-theme-dark :focus-visible { outline-color: var(--app-pink); }
+.app-theme-dark :is(input, select, textarea):focus { border-color: var(--app-pink) !important; box-shadow: 0 0 0 3px rgba(240, 138, 204, .18) !important; }
+.app-theme-dark ::selection { background: #8f3c78; color: #fff; }
+html.app-theme-dark { scrollbar-color: #55515f #191a20; }
+html.app-theme-dark ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.app-theme-dark ::-webkit-scrollbar-track { background: #191a20; }
+html.app-theme-dark ::-webkit-scrollbar-thumb { background: #55515f; border: 2px solid #191a20; border-radius: 999px; }
+html.app-theme-dark ::-webkit-scrollbar-thumb:hover { background: #777181; }
+
 @media (max-width: 1023px) {
-  .app-theme-dark aside { background-color: #1b151e !important; border-color: var(--app-border) !important; }
+  .app-theme-dark aside { background-color: var(--app-surface) !important; border-color: var(--app-border) !important; }
 }
 
 /* Match the supplied split login composition while retaining the existing flows. */

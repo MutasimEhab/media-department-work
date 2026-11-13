@@ -12,6 +12,14 @@ export const AppShell: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   React.useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('app-theme-dark', isAuthenticated && theme === 'dark');
+    root.classList.toggle('app-theme-light', isAuthenticated && theme === 'light');
+    return () => {
+      root.classList.remove('app-theme-dark', 'app-theme-light');
+    };
+  }, [isAuthenticated, theme]);
+  React.useEffect(() => {
     let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (!institutionLogo) { favicon?.remove(); return; }
     if (!favicon) {
