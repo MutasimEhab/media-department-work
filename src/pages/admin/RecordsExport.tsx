@@ -3,6 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
 import { WorkLog } from '../../types';
+import { EnglishDateInput } from '../../components/ui/EnglishDateInput';
 import { downloadWorkReportPdf, ReportEmployee } from '../../utils/workReportPdf';
 
 export const RecordsExport: React.FC = () => {
@@ -78,8 +79,8 @@ export const RecordsExport: React.FC = () => {
     <Card title="فلترة سجل الأعمال">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="text-sm">الموظف<select className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={employeeId} onChange={event => setEmployeeId(event.target.value)}><option value="">جميع الموظفين</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.arabicName}</option>)}</select></label>
-        <label className="text-sm">من تاريخ<input type="date" className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={from} onChange={event => setFrom(event.target.value)} /></label>
-        <label className="text-sm">إلى تاريخ<input type="date" className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={to} onChange={event => setTo(event.target.value)} /></label>
+        <label className="text-sm">من تاريخ<EnglishDateInput className="mt-1" value={from} onChange={setFrom} ariaLabel="من تاريخ" /></label>
+        <label className="text-sm">إلى تاريخ<EnglishDateInput className="mt-1" value={to} onChange={setTo} ariaLabel="إلى تاريخ" /></label>
         <label className="text-sm sm:col-span-2">بحث بالموظف أو التفاصيل<input className="mt-1 block min-h-11 w-full rounded-input border border-brand-border bg-transparent px-3" value={query} onChange={event => setQuery(event.target.value)} /></label>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2"><span className="me-auto text-sm">أعمال مطابقة: {rows.length}</span><Button variant="outline" onClick={() => { setFrom(''); setTo(''); setQuery(''); setEmployeeId(''); }}>مسح الفلاتر</Button><Button disabled={loading || !!loadError} onClick={exportCsv}>تصدير Excel / CSV</Button><Button variant="outline" disabled={loading || pdfBusy || !!loadError || !rows.length} isLoading={pdfBusy} onClick={() => void exportPdf()}>تنزيل PDF بالترويسة</Button></div>

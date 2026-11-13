@@ -4,6 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TextField } from '../../components/ui/TextField';
 import { Textarea } from '../../components/ui/Textarea';
+import { EnglishDateInput } from '../../components/ui/EnglishDateInput';
 import { useApp } from '../../context/AppContext';
 
 const projectStatusLabels: Record<string,string> = { IN_PROGRESS:'قيد التنفيذ', COMPLETED:'مكتمل', CLOSED:'مغلق', ON_HOLD:'متوقف مؤقتًا' };
@@ -55,7 +56,7 @@ export const ProjectWorkspace: React.FC = () => {
         <TextField label={tx('اسم المشروع','Project name')} value={title} onChange={event=>setTitle(event.target.value)} dir="rtl" requiredIndicator helperText={tx('اكتب اسم المشروع بالعربية.','Enter the project name in Arabic.')}/>
         <Textarea label={tx('وصف المشروع','Project description')} value={description} onChange={event=>setDescription(event.target.value)} dir="rtl" rows={4} helperText={tx('اكتب الوصف بالعربية.','Enter the description in Arabic.')}/>
         <label className="block text-sm">{tx('الموظف المسؤول','Project owner')}<select className="mt-1 w-full rounded-input border border-brand-border p-3" value={newOwner} onChange={event=>setNewOwner(event.target.value)} disabled={!manager}>{users.filter(user=>user.role==='EMPLOYEE'&&user.isActive).map(user=><option key={user.id} value={user.id}>{ar?user.arabicName:user.englishName}</option>)}</select></label>
-        <div className="grid gap-4 sm:grid-cols-2"><TextField label={tx('تاريخ البداية','Start date')} type="date" dir="ltr" value={startDate} onChange={event=>setStartDate(event.target.value)}/><TextField label={tx('تاريخ الانتهاء المتوقع','Expected end date')} type="date" dir="ltr" value={endDate} onChange={event=>setEndDate(event.target.value)}/></div>
+        <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm">{tx('تاريخ البداية','Start date')}<EnglishDateInput className="mt-1" value={startDate} onChange={setStartDate} ariaLabel="تاريخ البداية" /></label><label className="text-sm">{tx('تاريخ الانتهاء المتوقع','Expected end date')}<EnglishDateInput className="mt-1" value={endDate} onChange={setEndDate} ariaLabel="تاريخ الانتهاء المتوقع" /></label></div>
         <label className="block text-sm">{tx('التكليف المرتبط','Related assignment')}<select className="mt-1 w-full rounded-input border border-brand-border p-3" value={linkedTask} onChange={event=>setLinkedTask(event.target.value)}><option value="">{tx('بدون تكليف مرتبط','No linked assignment')}</option>{tasks.filter(task=>!task.isDraft).map(task=><option key={task.id} value={task.id}>{task.id} · {ar?task.titleAr:task.titleEn}</option>)}</select></label>
         <div className="flex gap-2"><Button type="submit">{tx('حفظ المشروع','Save project')}</Button><Button type="button" variant="outline" onClick={()=>navigate('/app/projects')}>{tx('إلغاء','Cancel')}</Button></div>
       </form>

@@ -6,6 +6,7 @@ import { useApp } from '../../context/AppContext';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { User, WorkLog } from '../../types';
 import { downloadWorkReportPdf } from '../../utils/workReportPdf';
+import { EnglishDateInput } from '../../components/ui/EnglishDateInput';
 
 interface DatabaseUsersResponse { users?: User[]; message?: string }
 interface WorkLogsResponse { workLogs?: WorkLog[]; message?: string }
@@ -96,8 +97,8 @@ export const ManagementWorkLogs: React.FC = () => {
     <Card><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <input className="rounded-input border border-brand-border p-2" placeholder={tx('بحث بالموظف أو التفاصيل أو المنطقة', 'Search employee, details or area')} value={query} onChange={event => setQuery(event.target.value)} />
       <select className="rounded-input border border-brand-border p-2" value={employee} onChange={event => setEmployee(event.target.value)}><option value="">{tx('كل الموظفين', 'All employees')}</option>{users.map(user => <option key={user.id} value={user.id}>{user.arabicName}</option>)}</select>
-      <input type="month" dir="ltr" aria-label={tx('تصفية حسب الشهر','Filter by month')} className="rounded-input border border-brand-border p-2" value={month} onChange={event => setMonth(event.target.value)} />
-      <input type="date" dir="ltr" className="rounded-input border border-brand-border p-2" value={date} onChange={event => setDate(event.target.value)} />
+      <EnglishDateInput type="month" ariaLabel={tx('تصفية حسب الشهر','Filter by month')} className="min-h-10 w-auto p-2" value={month} onChange={setMonth} />
+      <EnglishDateInput ariaLabel={tx('التاريخ','Date')} className="min-h-10 w-auto p-2" value={date} onChange={setDate} />
       <select className="rounded-input border border-brand-border p-2" value={mode} onChange={event => setMode(event.target.value)}><option value="">{tx('مكتب وميدان', 'Office and field')}</option><option value="OFFICE">{tx('مكتب', 'Office')}</option><option value="FIELD">{tx('ميدان', 'Field')}</option></select>
     </div></Card>
     {loading ? <Card>{tx('جارٍ تحميل السجلات…', 'Loading work logs…')}</Card> : error ? <Card><p role="alert" className="text-red-700">{error}</p></Card> : <>

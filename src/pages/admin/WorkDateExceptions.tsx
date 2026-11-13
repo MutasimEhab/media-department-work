@@ -3,6 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
 import { WorkDateException } from '../../types';
+import { EnglishDateInput } from '../../components/ui/EnglishDateInput';
 
 interface ExceptionRow extends WorkDateException {
   employeeNameAr: string;
@@ -126,10 +127,10 @@ export const WorkDateExceptions: React.FC<WorkDateExceptionsProps> = ({ mine = f
           </select>
         </label>
         <label className="block text-sm">تاريخ العمل الفائت
-          <input className="mt-1 min-h-11 w-full rounded-input border border-brand-border p-2" type="date" dir="ltr" value={date} onChange={event => setDate(event.target.value)} />
+          <EnglishDateInput className="mt-1" value={date} onChange={setDate} ariaLabel="تاريخ الاستثناء" />
         </label>
         <label className="block text-sm">آخر موعد لإدخال العمل السابق
-          <input className="mt-1 min-h-11 w-full rounded-input border border-brand-border p-2" type="datetime-local" dir="ltr" min={minExpiryDateTime} value={expiresAt} onChange={event => setExpiresAt(event.target.value)} />
+          <EnglishDateInput type="datetime-local" className="mt-1" value={expiresAt} onChange={setExpiresAt} ariaLabel="آخر موعد لإدخال العمل" min={minExpiryDateTime} />
           <span className="mt-1 block text-xs text-brand-charcoal/70">يجب أن يكون الموعد مستقبلياً. سيصل إشعار للموظف بتاريخ العمل والموعد النهائي.</span>
         </label>
         <label className="block text-sm">سبب الاستثناء

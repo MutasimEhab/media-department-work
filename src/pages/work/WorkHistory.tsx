@@ -6,6 +6,7 @@ import { Table } from '../../components/ui/Table';
 import { useApp } from '../../context/AppContext';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { WorkLog } from '../../types';
+import { EnglishDateInput } from '../../components/ui/EnglishDateInput';
 import { downloadCsv } from '../../utils/downloadCsv';
 import { formatArabicWorkDate } from '../../utils/dateFormatting';
 import { downloadWorkReportPdf } from '../../utils/workReportPdf';
@@ -106,8 +107,8 @@ export const WorkHistory: React.FC = () => {
     <Card>
       <div className="border-b border-brand-border pb-3"><h2 className="font-subheading font-bold">{tx('فلترة كشف الأعمال حسب الفترة', 'Filter work log by date range')}</h2></div>
       <div className="grid gap-3 pt-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="text-sm">{tx('من تاريخ', 'From date')}<input type="date" dir="ltr" className="mt-1 w-full rounded-input border border-brand-border p-2.5" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label>
-        <label className="text-sm">{tx('إلى تاريخ', 'To date')}<input type="date" dir="ltr" className="mt-1 w-full rounded-input border border-brand-border p-2.5" value={toDate} onChange={event => setToDate(event.target.value)} /></label>
+        <label className="text-sm">{tx('من تاريخ', 'From date')}<EnglishDateInput className="mt-1" value={fromDate} onChange={setFromDate} ariaLabel={tx('من تاريخ','from date')} /></label>
+        <label className="text-sm">{tx('إلى تاريخ', 'To date')}<EnglishDateInput className="mt-1" value={toDate} onChange={setToDate} ariaLabel={tx('إلى تاريخ','to date')} /></label>
         <label className="text-sm">{tx('بحث بالتفاصيل', 'Search details')}<input className="mt-1 w-full rounded-input border border-brand-border p-2.5" placeholder={tx('كلمة أو منطقة', 'Keyword or area')} value={query} onChange={event => setQuery(event.target.value)} /></label>
         <label className="text-sm">{tx('مكان العمل', 'Work location')}<select className="mt-1 w-full rounded-input border border-brand-border p-2.5" value={mode} onChange={event => setMode(event.target.value)}><option value="">{tx('الكل', 'All')}</option><option value="OFFICE">{tx('المكتب', 'Office')}</option><option value="FIELD">{tx('الميدان', 'Field')}</option></select></label>
         <label className="text-sm sm:col-span-2">{tx('المنطقة', 'Area')}<input className="mt-1 w-full rounded-input border border-brand-border p-2.5" placeholder={tx('تصفية حسب المنطقة', 'Filter by area')} value={area} onChange={event => setArea(event.target.value)} /></label>

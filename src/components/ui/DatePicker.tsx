@@ -1,5 +1,6 @@
 import React, { useId } from 'react';
-import { Calendar, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { EnglishDateInput } from './EnglishDateInput';
 
 export interface DatePickerProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -16,6 +17,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   id,
   disabled,
   className = '',
+  value,
+  onChange,
   ...props
 }) => {
   const generatedId = useId();
@@ -32,32 +35,20 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         </label>
       )}
 
-      <div className="relative flex items-center">
-        <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none text-brand-charcoal/70">
-          <Calendar className="w-4 h-4" />
-        </div>
-
-        <input
-          type="date" dir="ltr"
-          id={inputId}
-          disabled={disabled}
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? errorId : helperText ? helperId : undefined}
-          className={`
-            w-full rounded-input border bg-white ps-10 pe-3.5 py-2.5 text-sm text-brand-darkText
-            min-h-[44px] transition-colors font-mono
-            ${
-              error
-                ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200'
-                : 'border-brand-border focus:border-brand-plum focus:ring-2 focus:ring-brand-plum/20'
-            }
-            disabled:bg-brand-lightGray/50 disabled:text-brand-charcoal/50 disabled:cursor-not-allowed
-            focus:outline-none
-            ${className}
-          `}
-          {...props}
-        />
-      </div>
+      <EnglishDateInput
+        id={inputId}
+        ariaLabel={label}
+        ariaInvalid={Boolean(error)}
+        ariaDescribedBy={error ? errorId : helperText ? helperId : undefined}
+        value={String(value ?? '')}
+        onChange={() => undefined}
+        onChangeEvent={onChange}
+        disabled={disabled}
+        required={requiredIndicator || props.required}
+        min={typeof props.min === 'string' ? props.min : undefined}
+        max={typeof props.max === 'string' ? props.max : undefined}
+        className={`bg-white ${error ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200' : ''} ${className}`}
+      />
 
       {error ? (
         <p id={errorId} role="alert" className="text-xs text-red-600 flex items-center gap-1 font-medium">
