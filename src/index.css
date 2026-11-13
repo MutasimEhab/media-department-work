@@ -149,6 +149,7 @@ body {
 h1, h2, h3 {
   font-family: 'Tajawal', 'Janna LT', sans-serif;
   font-weight: 800;
+  text-wrap: balance;
 }
 
 /* Ensure Latin numerals 0-9 throughout text and UI */
@@ -173,16 +174,16 @@ h1, h2, h3 {
 
 /* Application surfaces follow the supplied dark institutional UI references. */
 .app-theme-dark {
-  --app-bg: #111216;
-  --app-surface: #191a20;
-  --app-raised: #20212a;
-  --app-raised-hover: #282a34;
-  --app-border: #373944;
-  --app-text: #f4f4f7;
-  --app-muted: #b8bbc6;
-  --app-pink: #f08acc;
-  --app-plum: #cf79b5;
-  --app-shadow: 0 8px 24px rgba(0, 0, 0, .24);
+  --app-bg: #101116;
+  --app-surface: #171920;
+  --app-raised: #1e2028;
+  --app-raised-hover: #292c36;
+  --app-border: #383b47;
+  --app-text: #f5f5f8;
+  --app-muted: #c0c3cd;
+  --app-pink: #f29bd4;
+  --app-plum: #d68bc0;
+  --app-shadow: 0 10px 28px rgba(0, 0, 0, .28);
   color-scheme: dark;
   background: var(--app-bg) !important;
   color: var(--app-text) !important;
@@ -232,6 +233,8 @@ html.app-theme-dark body {
 .app-theme-dark [class~="bg-red-50"],
 .app-theme-dark [class~="bg-red-100"] { background-color: #3b2024 !important; }
 .app-theme-dark [class~="bg-blue-50"] { background-color: #1e293b !important; }
+.app-theme-dark [class~="bg-amber-100/70"] { background-color: #3b2d18 !important; }
+.app-theme-dark [class~="bg-white/90"] { background-color: var(--app-surface) !important; }
 .app-theme-dark [class~="text-brand-darkText"],
 .app-theme-dark [class~="text-brand-charcoal"],
 .app-theme-dark [class~="text-gray-900"],
@@ -309,16 +312,17 @@ html.app-theme-dark body {
 .app-theme-dark [class~="border-red-300"],
 .app-theme-dark [class~="border-red-400"],
 .app-theme-dark [class~="border-red-500"] { border-color: #853b42 !important; }
+.app-theme-dark [class~="border-amber-400"] { border-color: #8a6a32 !important; }
 .app-theme-dark input:not([type="checkbox"]):not([type="radio"]),
 .app-theme-dark select,
 .app-theme-dark textarea {
-  background-color: #15161b;
+  background-color: #12141a;
   border-color: var(--app-border);
   color: var(--app-text);
   caret-color: var(--app-pink);
 }
 .app-theme-dark input::placeholder,
-.app-theme-dark textarea::placeholder { color: #aeb1bc; opacity: 1; }
+.app-theme-dark textarea::placeholder { color: #aeb2be; opacity: 1; }
 .app-theme-dark input[type="checkbox"],
 .app-theme-dark input[type="radio"] { accent-color: #c80893; }
 .app-theme-dark table tbody tr { border-color: var(--app-border); }
@@ -385,9 +389,45 @@ html.app-theme-dark body {
 .app-theme-dark ::selection { background: #8f3c78; color: #fff; }
 html.app-theme-dark { scrollbar-color: #55515f #191a20; }
 html.app-theme-dark ::-webkit-scrollbar { width: 10px; height: 10px; }
-html.app-theme-dark ::-webkit-scrollbar-track { background: #191a20; }
-html.app-theme-dark ::-webkit-scrollbar-thumb { background: #55515f; border: 2px solid #191a20; border-radius: 999px; }
-html.app-theme-dark ::-webkit-scrollbar-thumb:hover { background: #777181; }
+html.app-theme-dark ::-webkit-scrollbar-track { background: var(--app-surface); }
+html.app-theme-dark ::-webkit-scrollbar-thumb { background: #555a67; border: 2px solid var(--app-surface); border-radius: 999px; }
+html.app-theme-dark ::-webkit-scrollbar-thumb:hover { background: #777d8b; }
+
+/* Keep utility-based states legible when components use Tailwind color variants. */
+.app-theme-dark [class*="hover:bg-brand-lightGray"]:hover,
+.app-theme-dark [class*="hover:bg-gray-50"]:hover,
+.app-theme-dark [class*="hover:bg-gray-100"]:hover,
+.app-theme-dark [class*="hover:bg-slate-50"]:hover,
+.app-theme-dark [class*="hover:bg-slate-100"]:hover { background-color: var(--app-raised-hover) !important; }
+.app-theme-dark [class*="hover:text-brand-darkText"]:hover,
+.app-theme-dark [class*="hover:text-brand-charcoal"]:hover { color: var(--app-text) !important; }
+.app-theme-dark [class*="hover:text-brand-plum"]:hover,
+.app-theme-dark [class*="hover:text-brand-magenta"]:hover { color: var(--app-pink) !important; }
+.app-theme-dark :focus-visible {
+  outline: 2px solid var(--app-pink) !important;
+  outline-offset: 2px;
+}
+.app-theme-dark :is(input, select, textarea):focus-visible {
+  border-color: var(--app-pink) !important;
+  box-shadow: 0 0 0 3px rgba(242, 155, 212, .2) !important;
+}
+.app-theme-dark [role="dialog"] { overscroll-behavior: contain; }
+.app-theme-dark :is(button, a, input, select, textarea) {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(242, 155, 212, .18);
+}
+.app-theme-dark :is(table, .font-mono, input[type="number"]) { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  .app-theme-dark,
+  .app-theme-light,
+  .app-theme-dark *,
+  .app-theme-light * {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}
 
 @media (max-width: 1023px) {
   .app-theme-dark aside { background-color: var(--app-surface) !important; border-color: var(--app-border) !important; }

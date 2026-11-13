@@ -13,10 +13,14 @@ export const AppShell: React.FC = () => {
   const navigate = useNavigate();
   React.useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle('app-theme-dark', isAuthenticated && theme === 'dark');
+    const isDark = isAuthenticated && theme === 'dark';
+    root.classList.toggle('app-theme-dark', isDark);
     root.classList.toggle('app-theme-light', isAuthenticated && theme === 'light');
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = isDark ? '#101116' : '#e6e7e9';
     return () => {
       root.classList.remove('app-theme-dark', 'app-theme-light');
+      if (themeColor) themeColor.content = '#e6e7e9';
     };
   }, [isAuthenticated, theme]);
   React.useEffect(() => {
