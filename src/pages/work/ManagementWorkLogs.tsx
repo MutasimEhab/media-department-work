@@ -38,7 +38,7 @@ export const ManagementWorkLogs: React.FC = () => {
         logsResponse.json() as Promise<WorkLogsResponse>,
         usersResponse.json() as Promise<DatabaseUsersResponse>,
       ]);
-      if (!logsResponse.ok) throw new Error(logsPayload.message || 'تعذر تحميل سجلات الدائرة.');
+      if (!logsResponse.ok) throw new Error(logsPayload.message || 'تعذر تحميل سجلات القسم.');
       if (!usersResponse.ok) throw new Error(usersPayload.message || 'تعذر تحميل قائمة الموظفين.');
       if (cancelled) return;
       setWorkLogs(logsPayload.workLogs || []);

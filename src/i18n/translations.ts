@@ -3,7 +3,7 @@ export type Language = 'ar' | 'en';
 export const translations = {
   ar: {
     app: {
-      title: 'نظام إدارة عمل دائرة الإعلام',
+      title: 'نظام إدارة عمل قسم الإعلام',
       subTitle: 'مؤسسة السمع والبصر للتنمية والتأهيل المجتمعي',
       demoBanner: 'بيانات تجريبية وهمية 100% محفوظة في الذاكرة — لا ترتبط بأنظمة إنتاجية أو بريد إلكتروني حقيقي',
       roleSimulator: 'محاكي الأدوار (لأغراض العرض):',
@@ -57,9 +57,9 @@ export const translations = {
     },
     roles: {
       ADMIN: 'مسؤول النظام',
-      MANAGER: 'مدير الدائرة',
-      DEPUTY: 'نائب مدير الدائرة',
-      EMPLOYEE: 'موظف الدائرة',
+      MANAGER: 'مدير القسم',
+      DEPUTY: 'نائب مدير القسم',
+      EMPLOYEE: 'موظف القسم',
     },
     status: {
       RECEIVED: 'تم الاستلام',

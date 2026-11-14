@@ -52,10 +52,11 @@ router.use(requireAuth);
 router.get('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
   const mayViewDepartment = actor.roleCode === 'system_admin'
-    || (['department_manager', 'deputy_manager'].includes(actor.roleCode)
-      && (request.permissions?.includes('view_circulars') || request.permissions?.includes('manage_circulars')
-        || request.permissions?.includes('track_circulars')));
-  if (!mayViewDepartment && !request.permissions?.includes('view_circulars')) {
+    || Boolean(actor.departmentId && (request.permissions?.includes('track_circulars')
+      || (['department_manager', 'deputy_manager'].includes(actor.roleCode)
+        && (request.permissions?.includes('view_circulars') || request.permissions?.includes('manage_circulars')))));
+  if (!mayViewDepartment && !request.permissions?.includes('view_circulars')
+    && !request.permissions?.includes('track_circulars') && !request.permissions?.includes('manage_circulars')) {
     response.status(403).json({ message: 'لا تملك صلاحية عرض التعاميم.' });
     return;
   }
@@ -106,13 +107,13 @@ async function saveCircular(request: AuthenticatedRequest, response: import('exp
       : departmentResult.rows[0]?.department_id ?? null;
     if (!departmentId) {
       await client.query('ROLLBACK');
-      response.status(400).json({ message: actor.roleCode === 'system_admin' ? 'اختر الدائرة التي تريد توجيه التعميم إليها.' : 'حسابك غير مرتبط بدائرة؛ يرجى مراجعة مدير النظام.' });
+      response.status(400).json({ message: actor.roleCode === 'system_admin' ? 'اختر القسم الذي تريد توجيه التعميم إليه.' : 'حسابك غير مرتبط بقسم؛ يرجى مراجعة مدير النظام.' });
       return;
     }
     const departmentExists = await client.query('SELECT id FROM departments WHERE id = $1', [departmentId]);
     if (!departmentExists.rows[0]) {
       await client.query('ROLLBACK');
-      response.status(400).json({ message: 'الدائرة المختارة غير موجودة؛ حدّث القائمة ثم أعد المحاولة.' });
+      response.status(400).json({ message: 'القسم المختار غير موجود؛ حدّث القائمة ثم أعد المحاولة.' });
       return;
     }
 
@@ -133,7 +134,7 @@ async function saveCircular(request: AuthenticatedRequest, response: import('exp
       );
       if (eligible.rows.length !== requested.length) {
         await client.query('ROLLBACK');
-        response.status(400).json({ message: 'اختر مستلمين نشطين من دائرتك فقط.' });
+        response.status(400).json({ message: 'اختر مستلمين نشطين من قسمك فقط.' });
         return;
       }
     }

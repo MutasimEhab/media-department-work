@@ -26,7 +26,7 @@ export const WelcomeGreeting: React.FC = () => {
           </div>
           <span className="absolute -bottom-2 -left-2 flex h-8 w-8 items-center justify-center rounded-full border-[3px] border-white bg-brand-magenta text-white shadow-sm"><Sparkles className="h-3.5 w-3.5" /></span>
         </div>
-        <p className="text-xs font-semibold text-brand-plum">مرحباً بك في نظام إدارة أعمال دائرة الإعلام</p>
+        <p className="text-xs font-semibold text-brand-plum">مرحباً بك في نظام إدارة أعمال قسم الإعلام</p>
         <h2 className="mt-2 text-xl font-bold text-brand-darkText sm:text-2xl">أهلاً وسهلاً، {currentUser.arabicName}</h2>
         <p className="mt-2 max-w-sm text-sm text-brand-charcoal">{currentUser.jobTitleAr} · نتمنى لك يوماً موفقاً.</p>
       </div>

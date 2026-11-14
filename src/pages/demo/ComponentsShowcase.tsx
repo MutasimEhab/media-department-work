@@ -465,7 +465,7 @@ export const ComponentsShowcase: React.FC = () => {
 
                 <Checkbox
                   label="طلب استثناء إداري للتسجيل"
-                  description="يتطلب موافقة رسمية من مدير الدائرة."
+                  description="يتطلب موافقة رسمية من مدير القسم."
                   disabled
                 />
               </div>
@@ -672,7 +672,7 @@ export const ComponentsShowcase: React.FC = () => {
                   id: '1',
                   title: 'تم اعتماد مخرجات التكليف TSK-103',
                   timestamp: '10:30 ص',
-                  author: 'عمر النجار (مدير الدائرة)',
+                  author: 'عمر النجار (مدير القسم)',
                   description: 'تمت مراجعة الفيديو التلخيصي والموافقة على نشره رسمياً.',
                   icon: <CheckCircle2 className="w-3.5 h-3.5 text-brand-green" />,
                 },

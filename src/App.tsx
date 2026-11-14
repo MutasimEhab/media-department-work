@@ -68,10 +68,10 @@ export const App: React.FC = () => {
             <Route path="projects/new" element={<PermissionGuard permission="manage_projects"><ProjectWorkspace /></PermissionGuard>} />
             <Route path="projects/:id" element={<PermissionGuard permission="view_projects"><ProjectWorkspace /></PermissionGuard>} />
             <Route path="media" element={<PermissionGuard permission="view_assignments"><MediaWorkflow /></PermissionGuard>} />
-            <Route path="circulars" element={<PermissionGuard permission="view_circulars"><CircularInbox /></PermissionGuard>} />
+            <Route path="circulars" element={<PermissionGuard permission={['view_circulars','manage_circulars','track_circulars']}><CircularInbox /></PermissionGuard>} />
             <Route path="circulars/new" element={<PermissionGuard permission="manage_circulars"><CircularEditor /></PermissionGuard>} />
             <Route path="circulars/:id/edit" element={<PermissionGuard permission="manage_circulars"><CircularEditor /></PermissionGuard>} />
-            <Route path="circulars/:id/tracking" element={<PermissionGuard permission="track_circulars"><CircularTracking /></PermissionGuard>} />
+            <Route path="circulars/:id/tracking" element={<PermissionGuard permission={['track_circulars','manage_circulars']}><CircularTracking /></PermissionGuard>} />
             <Route path="admin/users/new" element={<PermissionGuard permission="manage_users"><AdminPages /></PermissionGuard>} />
             <Route path="admin/users/:id" element={<PermissionGuard permission="manage_users"><AdminPages /></PermissionGuard>} />
             <Route path="admin/settings" element={<PermissionGuard permission="manage_system_settings"><AdminPages /></PermissionGuard>} />

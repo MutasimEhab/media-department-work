@@ -16,7 +16,7 @@ router.get('/monthly', async (request: AuthenticatedRequest, response) => {
   }
   if (department) {
     if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('view_department_reports')) {
-      response.status(403).json({ message: 'لا تملك صلاحية عرض تقارير الدائرة.' });
+      response.status(403).json({ message: 'لا تملك صلاحية عرض تقارير القسم.' });
       return;
     }
   } else if (!request.permissions?.includes('view_own_report')) {

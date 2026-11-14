@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
 
 export const CircularTracking: React.FC = () => {
-  const { language, circulars, users, recordCircularReminder } = useApp();
+  const { language, circulars, users, recordCircularReminder, canAccess } = useApp();
   const { id } = useParams();
   const circular = circulars.find(item => item.id === id);
   const ar = language === 'ar';
@@ -55,7 +55,7 @@ export const CircularTracking: React.FC = () => {
           <p>{users.find(user => user.id === recipient.userId)?.[ar ? 'jobTitleAr' : 'jobTitleEn']}</p>
           <p>{recipient.hasAcknowledged ? tx(`تم الإقرار · ${recipient.acknowledgedAt || ''}`, `Acknowledged · ${recipient.acknowledgedAt || ''}`) : tx('لم يقر بعد', 'Not acknowledged')}</p>
           <p>{tx('محاولات التذكير', 'Reminder attempts')}: {recipient.reminderCount || 0}</p>
-          {!recipient.hasAcknowledged && <Button size="sm" disabled={pendingUserId === recipient.userId} onClick={() => void sendReminder(recipient.userId)}>{pendingUserId === recipient.userId ? tx('جارٍ الحفظ…', 'Saving…') : tx('تسجيل محاولة تذكير', 'Record reminder attempt')}</Button>}
+          {!recipient.hasAcknowledged && canAccess('track_circulars') && <Button size="sm" disabled={pendingUserId === recipient.userId} onClick={() => void sendReminder(recipient.userId)}>{pendingUserId === recipient.userId ? tx('جارٍ الحفظ…', 'Saving…') : tx('تسجيل محاولة تذكير', 'Record reminder attempt')}</Button>}
         </article>)}
       </div>
     </Card>

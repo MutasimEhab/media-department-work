@@ -86,7 +86,7 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
 router.post('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
   if (!canManage(request)) {
-    response.status(403).json({ message: 'إصدار استثناءات العمل متاح لمدير النظام ومدير الدائرة ونائبه.' });
+    response.status(403).json({ message: 'إصدار استثناءات العمل متاح لمدير النظام ومدير القسم ونائبه.' });
     return;
   }
 

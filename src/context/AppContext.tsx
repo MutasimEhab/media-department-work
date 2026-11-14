@@ -6,6 +6,7 @@ import {
 import { translations, Language } from '../i18n/translations';
 import { AppPermission, DEFAULT_ROLE_PERMISSIONS, roleHasPermission, RolePermissionOverrides } from '../auth/permissions';
 import { ToastAction, ToastItem, ToastType } from '../components/ui/Toast';
+import { playNotificationSound, unlockNotificationAudio } from '../utils/notificationSound';
 
 export type DisplayTheme = 'light' | 'dark';
 
@@ -158,6 +159,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const timer = window.setInterval(refreshDate, 60_000);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const unlock = () => unlockNotificationAudio();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, [isAuthenticated]);
   // Keep a harmless fallback for pages such as sign-in; AppShell blocks every internal route until authentication.
   const [currentUser, setCurrentUser] = useState<User>(() => {
     try {
@@ -176,6 +187,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const fresh = incoming.filter(item => !previous.ids.has(item.id) && !item.isRead);
     notificationBaseline.current = { userId: currentUser.id, initialized: true, ids: new Set([...previous.ids, ...incoming.map(item => item.id)]) };
     setNotifications(incoming);
+    if (fresh.length) {
+      try {
+        const sound = (JSON.parse(localStorage.getItem('official_system_settings') || '{}') as { notificationSound?: string }).notificationSound;
+        playNotificationSound(sound || 'soft-bell');
+      } catch { playNotificationSound('soft-bell'); }
+    }
     fresh.slice(0, 3).forEach(item => notify(item.messageAr, 'info', {
       title: item.titleAr,
       url: item.actionUrl || '/app/notifications',

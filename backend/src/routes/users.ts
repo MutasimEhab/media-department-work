@@ -184,7 +184,7 @@ router.patch('/job-titles/:titleId', async (request: AuthenticatedRequest, respo
     const current = found.rows[0];
     if (!current || (actor.roleCode !== 'system_admin' && current.department_id !== actor.departmentId)) {
       await client.query('ROLLBACK');
-      response.status(404).json({ message: 'المسمى الوظيفي غير موجود في دائرتك.' });
+      response.status(404).json({ message: 'المسمى الوظيفي غير موجود في قسمك.' });
       return;
     }
     await client.query('UPDATE job_titles SET name_ar = $2 WHERE id = $1', [current.id, nameAr]);
@@ -400,13 +400,13 @@ router.patch('/:userId/profile', async (request: AuthenticatedRequest, response)
 
 router.patch('/:userId/department', async (request: AuthenticatedRequest, response) => {
   if (request.authUser!.roleCode !== 'system_admin') {
-    response.status(403).json({ message: 'ربط الحساب بدائرة متاح لمدير النظام فقط.' });
+    response.status(403).json({ message: 'ربط الحساب بقسم متاح لمدير النظام فقط.' });
     return;
   }
   const userId = routeUserId(request);
   const departmentId = typeof request.body?.departmentId === 'string' ? request.body.departmentId : '';
   if (!departmentId) {
-    response.status(400).json({ message: 'اختر الدائرة أولاً.' });
+    response.status(400).json({ message: 'اختر القسم أولاً.' });
     return;
   }
   try {
@@ -426,7 +426,7 @@ router.patch('/:userId/department', async (request: AuthenticatedRequest, respon
       );
       if (!department.rowCount) {
         await client.query('ROLLBACK');
-        response.status(404).json({ message: 'الدائرة المحددة غير موجودة.' });
+        response.status(404).json({ message: 'القسم المحددة غير موجودة.' });
         return;
       }
       await client.query('UPDATE users SET department_id = $2, updated_at = now() WHERE id = $1', [userId, departmentId]);
@@ -449,7 +449,7 @@ router.patch('/:userId/department', async (request: AuthenticatedRequest, respon
       client.release();
     }
   } catch {
-    response.status(503).json({ message: 'تعذر ربط الحساب بالدائرة حالياً.' });
+    response.status(503).json({ message: 'تعذر ربط الحساب بالقسم حالياً.' });
   }
 });
 
@@ -460,7 +460,7 @@ router.get('/:userId/permissions', async (request: AuthenticatedRequest, respons
     return;
   }
   if (!allowed) {
-    response.status(403).json({ message: 'تستطيع إدارة صلاحيات موظفي دائرتك فقط.' });
+    response.status(403).json({ message: 'تستطيع إدارة صلاحيات موظفي قسمك فقط.' });
     return;
   }
   const result = await db.query<{ code: string; name_ar: string; enabled: boolean }>(
@@ -485,7 +485,7 @@ router.put('/:userId/permissions', async (request: AuthenticatedRequest, respons
     return;
   }
   if (!allowed) {
-    response.status(403).json({ message: 'تستطيع إدارة صلاحيات موظفي دائرتك فقط.' });
+    response.status(403).json({ message: 'تستطيع إدارة صلاحيات موظفي قسمك فقط.' });
     return;
   }
   if (!Array.isArray(request.body?.permissionCodes)
@@ -604,7 +604,7 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
   const requestedDepartment = typeof body.departmentId === 'string' ? body.departmentId : '';
   const departmentId = actorIsAdmin ? requestedDepartment : actor.departmentId;
   if (!departmentId) {
-    response.status(400).json({ message: 'يجب تحديد الدائرة للحساب الجديد.' });
+    response.status(400).json({ message: 'يجب تحديد القسم للحساب الجديد.' });
     return;
   }
 

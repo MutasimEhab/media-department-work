@@ -19,7 +19,7 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
   const nameAr = typeof request.body?.nameAr === 'string' ? request.body.nameAr.trim() : '';
   const baseRoleCode = typeof request.body?.baseRoleCode === 'string' ? request.body.baseRoleCode : '';
   if (!nameAr || nameAr.length > 80 || !baseRoles.has(baseRoleCode)) {
-    response.status(400).json({ message: 'أدخل اسماً صالحاً واختر نوعاً أساسياً من مدير الدائرة أو نائبه أو الموظف.' });
+    response.status(400).json({ message: 'أدخل اسماً صالحاً واختر نوعاً أساسياً من مدير القسم أو نائبه أو الموظف.' });
     return;
   }
   const code = `custom_${randomUUID().replaceAll('-', '')}`;

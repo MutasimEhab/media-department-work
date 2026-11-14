@@ -101,19 +101,19 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
     if (!owner || owner.role_code !== 'employee' || !owner.is_active
       || (actor.roleCode !== 'system_admin' && owner.department_id !== actor.departmentId)) {
       await client.query('ROLLBACK');
-      response.status(400).json({ message: 'اختر موظفاً نشطاً من دائرتك ليكون مسؤول المشروع.' });
+      response.status(400).json({ message: 'اختر موظفاً نشطاً من قسمك ليكون مسؤول المشروع.' });
       return;
     }
     if (!owner.department_id) {
       await client.query('ROLLBACK');
-      response.status(400).json({ message: 'حساب الموظف غير مرتبط بدائرة.' });
+      response.status(400).json({ message: 'حساب الموظف غير مرتبط بقسم.' });
       return;
     }
     if (assignmentId) {
       const linked = await client.query('SELECT id FROM assignments WHERE id = $1 AND department_id = $2', [assignmentId, owner.department_id]);
       if (!linked.rows[0]) {
         await client.query('ROLLBACK');
-        response.status(400).json({ message: 'التكليف المرتبط غير موجود ضمن دائرة المشروع.' });
+        response.status(400).json({ message: 'التكليف المرتبط غير موجود ضمن قسم المشروع.' });
         return;
       }
     }

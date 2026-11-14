@@ -6,7 +6,7 @@ import { ALL_PERMISSIONS, AppPermission, DEFAULT_ROLE_PERMISSIONS, PERMISSION_LA
 
 interface AccountType { code: string; nameAr: string; baseRoleCode: string; isSystem: boolean }
 const BASE_ROLE_LABELS: Record<string, string> = {
-  department_manager: 'مدير الدائرة', deputy_manager: 'نائب مدير الدائرة', employee: 'موظف',
+  department_manager: 'مدير القسم', deputy_manager: 'نائب مدير القسم', employee: 'موظف',
 };
 const ADMIN_ONLY = new Set(['manage_system_settings', 'view_audit_log', 'view_system_health']);
 const EMPLOYEE_RESTRICTED = new Set(['view_management_dashboard', 'view_department_work_logs', 'view_department_reports', 'manage_users', 'manage_work_exceptions']);

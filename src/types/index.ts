@@ -28,6 +28,7 @@ export interface WorkDateException {
 
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type TaskType = 'NORMAL' | 'SOCIAL_MEDIA';
+export type AssignmentCategory = 'MATERIALS_REQUIRED' | 'SOCIAL_MEDIA';
 export type TaskRecipientStatus = 'RECEIVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'APPROVED' | 'RETURNED_FOR_REVISION';
 
 export interface TaskRecipient {
@@ -55,6 +56,7 @@ export interface Task {
   creatorNameEn: string;
   priority: TaskPriority;
   type: TaskType;
+  types?: AssignmentCategory[];
   deadline: string; // e.g. "2026-11-02 05:00 PM"
   createdAt: string;
   isDraft: boolean;

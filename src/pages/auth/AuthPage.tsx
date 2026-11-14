@@ -59,9 +59,9 @@ export const AuthPage: React.FC = () => {
     <main className="auth-page min-h-screen bg-brand-lightGray text-brand-charcoal p-4 sm:p-8">
       <div className="max-w-6xl mx-auto grid lg:grid-cols-2 items-stretch">
         <section className="space-y-6">
-          <p className="auth-system-title">نظام إدارة أعمال دائرة الإعلام</p>
-          <h1 className="text-3xl sm:text-4xl font-bold leading-relaxed">أعمال قسم الإعلامية</h1>
-          <p className="leading-8">نظام تسجيل ومتابعة أعمال موظفي قسم الإعلامية.</p>
+          <p className="auth-system-title">نظام إدارة أعمال قسم الإعلام</p>
+          <h1 className="text-3xl sm:text-4xl font-bold leading-relaxed">أعمال قسم الإعلام</h1>
+          <p className="leading-8">نظام تسجيل ومتابعة أعمال موظفي قسم الإعلام.</p>
           <div className="space-y-2 text-sm">
             {['تسجيل أعمال الموظفين اليومية', 'متابعة التكليفات والمشاريع', 'إدارة التعاميم والإشعارات'].map(item => (
               <p key={item} className="rounded-xl border border-white/25 bg-white/10 px-4 py-3">{item}</p>

@@ -31,7 +31,7 @@ export const AssignmentList: React.FC = () => {
     if(query&&!`${task.id} ${task.titleAr}`.toLowerCase().includes(query.toLowerCase())) return false;
     if(employee&&!task.recipients.some(recipient=>recipient.userId===employee)) return false;
     if(priority&&task.priority!==priority) return false;
-    if(kind&&task.type!==kind) return false;
+    if(kind&&!(task.types?.includes(kind as 'MATERIALS_REQUIRED'|'SOCIAL_MEDIA') || task.type===kind)) return false;
     if(date&&!task.deadline.startsWith(date)) return false;
     if(tab==='REVIEW'&&!task.recipients.some(recipient=>recipient.status==='SUBMITTED')) return false;
     if(tab==='OVERDUE'&&!task.isOverdue) return false;
@@ -48,7 +48,7 @@ export const AssignmentList: React.FC = () => {
       <input className="rounded-input border border-brand-border p-2.5" placeholder="ابحث بعنوان التكليف أو رقمه" value={query} onChange={event=>setQuery(event.target.value)}/>
       {manager&&<select className="rounded-input border border-brand-border p-2.5" value={employee} onChange={event=>setEmployee(event.target.value)}><option value="">كل الموظفين</option>{users.filter(user=>user.role==='EMPLOYEE').map(user=><option key={user.id} value={user.id}>{user.arabicName}</option>)}</select>}
       <select className="rounded-input border border-brand-border p-2.5" value={priority} onChange={event=>setPriority(event.target.value)}><option value="">كل الأولويات</option>{(Object.entries(priorityLabels) as [TaskPriority,string][]).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select>
-      <select className="rounded-input border border-brand-border p-2.5" value={kind} onChange={event=>setKind(event.target.value)}><option value="">كل أنواع التكليف</option><option value="NORMAL">عادي</option><option value="SOCIAL_MEDIA">وسائل التواصل الاجتماعي</option></select>
+      <select className="rounded-input border border-brand-border p-2.5" value={kind} onChange={event=>setKind(event.target.value)}><option value="">كل أنواع التكليف</option><option value="MATERIALS_REQUIRED">مطلوب مواد للمؤسسة / جهات المانحة</option><option value="SOCIAL_MEDIA">سوشيال ميديا</option></select>
       <label className="text-sm">تاريخ الاستحقاق<EnglishDateInput className="mt-1" value={date} onChange={setDate} ariaLabel="تاريخ الاستحقاق"/></label>
       <Button variant="outline" onClick={()=>{setQuery('');setEmployee('');setPriority('');setKind('');setDate('');setTab('ACTIVE')}}>مسح عوامل التصفية</Button>
     </div></Card>

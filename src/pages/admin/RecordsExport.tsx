@@ -46,7 +46,7 @@ export const RecordsExport: React.FC = () => {
     && (!from || item.date >= from) && (!to || item.date <= to)),
   [workLogs, query, from, to, employeeId]);
 
-  if (!canAccess('view_department_reports')) return <Card>لا تملك صلاحية تصدير سجلات الدائرة.</Card>;
+  if (!canAccess('view_department_reports')) return <Card>لا تملك صلاحية تصدير سجلات القسم.</Card>;
 
   const exportCsv = () => {
     const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;

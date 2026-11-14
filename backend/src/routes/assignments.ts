@@ -26,6 +26,8 @@ function mapRows(rows: Array<Record<string, any>>) {
         descriptionAr: row.description_ar, descriptionEn: row.description_ar,
         creatorId: row.created_by, creatorNameAr: row.creator_name, creatorNameEn: row.creator_name,
         priority: String(row.priority).toUpperCase(), type: row.kind === 'social_media' ? 'SOCIAL_MEDIA' : 'NORMAL',
+        types: Array.isArray(row.kind_flags) ? row.kind_flags.map((kind: string) => kind === 'materials_required' ? 'MATERIALS_REQUIRED' : 'SOCIAL_MEDIA')
+          : (row.kind === 'social_media' ? ['SOCIAL_MEDIA'] : []),
         deadline: formatDeadline(row.deadline), createdAt: row.created_at,
         isDraft: row.status === 'draft', projectId: row.project_id ?? undefined,
         referenceUrl: row.reference_url ?? undefined, reminderOptions: row.reminder_options ?? [],
@@ -65,6 +67,7 @@ router.use(requireAuth);
 router.get('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
   const mayViewDepartment = actor.roleCode === 'system_admin'
+    || Boolean(actor.departmentId && request.permissions?.includes('review_assignments'))
     || (['department_manager', 'deputy_manager'].includes(actor.roleCode)
       && (request.permissions?.includes('view_assignments') || request.permissions?.includes('manage_assignments')
         || request.permissions?.includes('review_assignments')));
@@ -74,7 +77,7 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
   }
   try {
     const result = await db.query(
-      `SELECT a.id, a.created_by, a.title_ar, a.description_ar, a.priority, a.kind, a.status,
+      `SELECT a.id, a.created_by, a.title_ar, a.description_ar, a.priority, a.kind, a.kind_flags, a.status,
               a.deadline, a.created_at, a.project_id, a.reference_url, a.reminder_options,
               a.notify_email, a.notify_sms, creator.full_name_ar AS creator_name,
               aa.id AS assignee_id, aa.user_id AS assignee_user_id, assignee.full_name_ar AS assignee_name,
@@ -111,8 +114,10 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
   const title = typeof body.titleAr === 'string' ? body.titleAr.trim() : '';
   const description = typeof body.descriptionAr === 'string' ? body.descriptionAr.trim() : '';
   const priority = typeof body.priority === 'string' ? body.priority.toLowerCase() : '';
-  // Type is optional; retain the legacy database default when no checkbox is selected.
-  const kind = body.type === 'SOCIAL_MEDIA' ? 'social_media' : 'normal';
+  const submittedTypes = Array.isArray(body.types) ? body.types : (body.type === 'SOCIAL_MEDIA' ? ['SOCIAL_MEDIA'] : []);
+  const kindFlags = [...new Set<string>(submittedTypes.filter((value: unknown): value is string => value === 'MATERIALS_REQUIRED' || value === 'SOCIAL_MEDIA')
+    .map((value: string) => value === 'MATERIALS_REQUIRED' ? 'materials_required' : 'social_media'))];
+  const kind = kindFlags.includes('social_media') ? 'social_media' : 'normal';
   const draft = body.isDraft === true;
   const deadline = parseDeadline(body.deadline);
   const assigneeIds = Array.isArray(body.assigneeIds)
@@ -144,20 +149,20 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
       const departments = new Set(selected.rows.map(row => row.department_id));
       if (selected.rows.length !== assigneeIds.length || departments.size !== 1) {
         await client.query('ROLLBACK');
-        response.status(400).json({ message: 'اختر موظفين نشطين من دائرة واحدة فقط.' });
+        response.status(400).json({ message: 'اختر موظفين نشطين من قسم واحد فقط.' });
         return;
       }
       const selectedDepartment = selected.rows[0]!.department_id;
       if (actor.roleCode !== 'system_admin' && selectedDepartment !== actor.departmentId) {
         await client.query('ROLLBACK');
-        response.status(403).json({ message: 'يمكنك تكليف موظفي دائرتك فقط.' });
+        response.status(403).json({ message: 'يمكنك تكليف موظفي قسمك فقط.' });
         return;
       }
       departmentId = selectedDepartment;
     }
     if (!departmentId) {
       await client.query('ROLLBACK');
-      response.status(400).json({ message: 'حدد موظفاً من الدائرة أو اربط الحساب بدائرة أولاً.' });
+      response.status(400).json({ message: 'حدد موظفاً من القسم أو اربط الحساب بقسم أولاً.' });
       return;
     }
 
@@ -165,13 +170,13 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
     if (id) {
       const updated = await client.query(
         `UPDATE assignments
-            SET title_ar = $3, description_ar = $4, priority = $5, kind = $6,
-                status = $7, deadline = ($8::date + $9::time) AT TIME ZONE 'Asia/Gaza',
-                reference_url = $10, reminder_options = $11::jsonb,
-                notify_email = $12, notify_sms = $13, updated_at = now()
+            SET title_ar = $3, description_ar = $4, priority = $5, kind = $6, kind_flags = $7::text[],
+                status = $8, deadline = ($9::date + $10::time) AT TIME ZONE 'Asia/Gaza',
+                reference_url = $11, reminder_options = $12::jsonb,
+                notify_email = $13, notify_sms = $14, updated_at = now()
           WHERE id = $1 AND created_by = $2 AND status = 'draft'
           RETURNING id`,
-        [id, actor.id, title, description, priority, kind, draft ? 'draft' : 'active', deadline.date, deadline.time,
+        [id, actor.id, title, description, priority, kind, kindFlags, draft ? 'draft' : 'active', deadline.date, deadline.time,
           referenceUrl || null, JSON.stringify(reminderOptions), body.emailDelivery === true, body.smsDelivery === true],
       );
       if (!updated.rows[0]) {
@@ -182,11 +187,11 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
       await client.query('DELETE FROM assignment_assignees WHERE assignment_id = $1', [id]);
     } else {
       const created = await client.query<{ id: string }>(
-        `INSERT INTO assignments (department_id, created_by, title_ar, description_ar, priority, kind,
+        `INSERT INTO assignments (department_id, created_by, title_ar, description_ar, priority, kind, kind_flags,
                                  status, deadline, reference_url, reminder_options, notify_email, notify_sms)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, ($8::date + $9::time) AT TIME ZONE 'Asia/Gaza', $10, $11::jsonb, $12, $13)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8, ($9::date + $10::time) AT TIME ZONE 'Asia/Gaza', $11, $12::jsonb, $13, $14)
          RETURNING id`,
-        [departmentId, actor.id, title, description, priority, kind, draft ? 'draft' : 'active', deadline.date, deadline.time,
+        [departmentId, actor.id, title, description, priority, kind, kindFlags, draft ? 'draft' : 'active', deadline.date, deadline.time,
           referenceUrl || null, JSON.stringify(reminderOptions), body.emailDelivery === true, body.smsDelivery === true],
       );
       assignmentId = created.rows[0]!.id;
@@ -218,7 +223,7 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
       [actor.id, draft ? 'assignment.draft.save' : 'assignment.send', assignmentId, JSON.stringify({ recipientCount: assigneeIds.length })],
     );
     const saved = await client.query(
-      `SELECT a.id, a.created_by, a.title_ar, a.description_ar, a.priority, a.kind, a.status,
+      `SELECT a.id, a.created_by, a.title_ar, a.description_ar, a.priority, a.kind, a.kind_flags, a.status,
               a.deadline, a.created_at, a.project_id, a.reference_url, a.reminder_options,
               a.notify_email, a.notify_sms, creator.full_name_ar AS creator_name,
               aa.id AS assignee_id, aa.user_id AS assignee_user_id, assignee.full_name_ar AS assignee_name,
@@ -241,7 +246,7 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
     console.error('Failed to save assignment:', error);
     const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
     const message = code === '23503'
-      ? 'تعذر حفظ التكليف بسبب ارتباط أحد الموظفين أو الدائرة؛ حدّث الصفحة وأعد اختيار المستلمين.'
+      ? 'تعذر حفظ التكليف بسبب ارتباط أحد الموظفين أو القسم؛ حدّث الصفحة وأعد اختيار المستلمين.'
       : code === '23514'
         ? 'تعذر حفظ التكليف بسبب قيمة غير مقبولة في قاعدة البيانات؛ راجع إعدادات قاعدة البيانات.'
         : code === '42703' || code === '42P01'
@@ -283,10 +288,10 @@ router.patch('/:assignmentId/recipients/:userId', async (request: AuthenticatedR
     await client.query('BEGIN');
     const lookup = await client.query<{
       assignee_id: string; current_status: string; assignment_status: string;
-      department_id: string; created_by: string; full_name_ar: string;
+      department_id: string; created_by: string; full_name_ar: string; assignment_title: string;
     }>(
       `SELECT aa.id AS assignee_id, aa.status AS current_status, a.status AS assignment_status,
-              a.department_id, a.created_by, u.full_name_ar
+              a.department_id, a.created_by, a.title_ar AS assignment_title, u.full_name_ar
          FROM assignments a JOIN assignment_assignees aa ON aa.assignment_id = a.id
          JOIN users u ON u.id = aa.user_id
         WHERE a.id = $1 AND aa.user_id = $2 FOR UPDATE OF aa`,
@@ -349,16 +354,34 @@ router.patch('/:assignmentId/recipients/:userId', async (request: AuthenticatedR
        VALUES ($1, $2, 'assignment_assignees', $3, $4::jsonb)`,
       [actor.id, `assignment.${eventType}`, updated.rows[0]!.id, JSON.stringify({ assignmentId: taskId, userId: targetUserId })],
     );
-    if (['SUBMITTED', 'APPROVED', 'RETURNED_FOR_REVISION'].includes(nextStatus)) {
-      const notifyUser = nextStatus === 'SUBMITTED' ? recipient.created_by : targetUserId;
+    if (nextStatus === 'SUBMITTED') {
+      const reviewers = await client.query<{ id: string }>(
+        `SELECT DISTINCT u.id
+           FROM users u
+           LEFT JOIN role_permissions rp ON rp.role_code = u.account_type_code AND rp.permission_code = 'review_assignments'
+           LEFT JOIN user_permission_overrides upo ON upo.user_id = u.id AND upo.permission_code = 'review_assignments'
+          WHERE u.is_active = true
+            AND (u.role_code = 'system_admin'
+                 OR (u.department_id = $1 AND COALESCE(upo.is_granted, rp.permission_code IS NOT NULL)))`,
+        [recipient.department_id],
+      );
+      for (const reviewer of reviewers.rows) {
+        if (reviewer.id === targetUserId) continue;
+        const body = `سلّم ${recipient.full_name_ar} مواد تكليف «${recipient.assignment_title}». افتح التكليف لمراجعة الروابط المرفقة.`;
+        await client.query(
+          `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id, action_url)
+           VALUES ($1, 'TASK_SUBMITTED', 'وصل تسليم جديد لمراجعته', $2, 'assignment', $3, $4)`,
+          [reviewer.id, body, taskId, `/app/assignments/${taskId}/review`],
+        );
+      }
+    } else if (['APPROVED', 'RETURNED_FOR_REVISION'].includes(nextStatus)) {
       const title = nextStatus === 'SUBMITTED' ? 'تسليم تكليف للمراجعة'
         : nextStatus === 'APPROVED' ? 'تم اعتماد تسليم التكليف' : 'أعيد تسليم التكليف للمراجعة';
-      const body = nextStatus === 'SUBMITTED' ? `قدّم ${recipient.full_name_ar} تسليماً جديداً للمراجعة.`
-        : nextStatus === 'APPROVED' ? 'تم اعتماد تسليمك.' : `يرجى مراجعة الملاحظة: ${reviewNote}`;
+      const body = nextStatus === 'APPROVED' ? 'تم اعتماد تسليمك.' : `يرجى مراجعة الملاحظة: ${reviewNote}`;
       await client.query(
         `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id, action_url)
          VALUES ($1, $2, $3, $4, 'assignment', $5, $6)`,
-        [notifyUser, nextStatus === 'SUBMITTED' ? 'TASK_SUBMITTED' : 'TASK_ASSIGNED', title, body, taskId, `/app/assignments/${taskId}`],
+        [targetUserId, 'TASK_ASSIGNED', title, body, taskId, `/app/assignments/${taskId}`],
       );
     }
     await client.query('COMMIT');

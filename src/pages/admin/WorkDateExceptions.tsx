@@ -98,7 +98,7 @@ export const WorkDateExceptions: React.FC<WorkDateExceptionsProps> = ({ mine = f
     <header className="flex flex-wrap items-center justify-between gap-3 app-page-heading">
       <div>
         <h1 className="text-2xl font-bold">{mine ? 'استثناءات تواريخ عملي' : 'استثناءات تواريخ العمل'}</h1>
-        <p>{mine ? 'التواريخ السابقة المعتمدة لحسابك.' : 'تُمنح الاستثناءات لموظفي الدائرة فقط، ويسجل النظام جهة المنح وسببه.'}</p>
+        <p>{mine ? 'التواريخ السابقة المعتمدة لحسابك.' : 'تُمنح الاستثناءات لموظفي القسم فقط، ويسجل النظام جهة المنح وسببه.'}</p>
       </div>
       {mayManage && <Button onClick={() => { setError(''); setGrantOpen(true); }}>منح استثناء</Button>}
     </header>

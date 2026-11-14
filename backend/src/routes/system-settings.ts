@@ -6,6 +6,7 @@ const router = Router();
 const SETTINGS_KEY = 'institutional';
 const workdays = new Set(['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة']);
 const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const notificationSounds = new Set(['soft-bell', 'clear-chime', 'gentle-pop', 'silent']);
 
 router.use(requireAuth);
 
@@ -39,6 +40,7 @@ router.put('/', async (request: AuthenticatedRequest, response) => {
     && value.smsNotificationsEnabled === false
     && Number.isInteger(value.sessionMinutes) && value.sessionMinutes >= 5 && value.sessionMinutes <= 240
     && value.language === 'ar'
+    && (value.notificationSound === undefined || (typeof value.notificationSound === 'string' && notificationSounds.has(value.notificationSound)))
     && (value.assignmentTypeNames === undefined || (value.assignmentTypeNames
       && typeof value.assignmentTypeNames.normal === 'string' && value.assignmentTypeNames.normal.trim().length > 0 && value.assignmentTypeNames.normal.length <= 60
       && typeof value.assignmentTypeNames.socialMedia === 'string' && value.assignmentTypeNames.socialMedia.trim().length > 0 && value.assignmentTypeNames.socialMedia.length <= 60))

@@ -40,7 +40,7 @@ export const Sidebar: React.FC = () => {
     icon: React.ReactNode;
     roles: ('ADMIN' | 'MANAGER' | 'DEPUTY' | 'EMPLOYEE')[];
     badge?: number;
-    permission?: import('../../auth/permissions').AppPermission;
+    permission?: import('../../auth/permissions').AppPermission | import('../../auth/permissions').AppPermission[];
   }
 
   const navItems: NavItem[] = [
@@ -112,7 +112,7 @@ export const Sidebar: React.FC = () => {
       label: role === 'EMPLOYEE' ? t.nav.myCirculars : t.nav.circulars,
       icon: <FileText className="w-5 h-5" />,
       roles: ['ADMIN', 'MANAGER', 'DEPUTY', 'EMPLOYEE'],
-      permission: 'view_circulars',
+      permission: ['view_circulars','manage_circulars','track_circulars'],
     },
     {
       to: '/app/notifications',
@@ -151,7 +151,7 @@ export const Sidebar: React.FC = () => {
     { to: '/app/admin/backup', label: 'النسخ الاحتياطي', icon: <CloudUpload className="w-5 h-5" />, roles: ['ADMIN'], permission: 'manage_system_settings' },
   ];
 
-  const allowedNav = navItems.filter(item => !item.permission || canAccess(item.permission));
+  const allowedNav = navItems.filter(item => !item.permission || (Array.isArray(item.permission) ? item.permission.some(canAccess) : canAccess(item.permission)));
   const allowedAdminNav = adminNavItems.filter(item => item.roles.includes(role) && (!item.permission || canAccess(item.permission as AppPermission)));
   useEffect(() => {
     if (allowedAdminNav.some(item => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`))) setAdminMenuOpen(true);

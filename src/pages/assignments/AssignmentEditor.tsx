@@ -7,7 +7,7 @@ import { TextField } from '../../components/ui/TextField';
 import { Textarea } from '../../components/ui/Textarea';
 import { EnglishDateInput } from '../../components/ui/EnglishDateInput';
 import { useApp } from '../../context/AppContext';
-import { Task, TaskPriority, TaskType } from '../../types';
+import { AssignmentCategory, Task, TaskPriority } from '../../types';
 
 const timeInput = (deadline?: string) => {
   const match = deadline?.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -30,11 +30,11 @@ export const AssignmentEditor: React.FC = () => {
   const [titleAr, setTitleAr] = useState(base?.titleAr || '');
   const [descriptionAr, setDescriptionAr] = useState(base?.descriptionAr || '');
   const [priority, setPriority] = useState<TaskPriority>(base?.priority || 'MEDIUM');
-  const [type, setType] = useState<TaskType | ''>(base?.type || '');
+  const [types, setTypes] = useState<AssignmentCategory[]>(base?.types || (base?.type === 'SOCIAL_MEDIA' ? ['SOCIAL_MEDIA'] : []));
   const [deadline, setDeadline] = useState(base?.deadline.split(' ')[0] || tomorrowInGaza(today));
   const [time, setTime] = useState(() => timeInput(base?.deadline));
   const [assignees, setAssignees] = useState<string[]>(base?.recipients.map(recipient => recipient.userId) || []);
-  const [typeNames, setTypeNames] = useState({ normal: 'عادي', socialMedia: 'وسائل التواصل الاجتماعي' });
+  const [typeNames, setTypeNames] = useState({ normal: 'مطلوب مواد للمؤسسة / جهات المانحة', socialMedia: 'سوشيال ميديا' });
   const [error, setError] = useState('');
   const [serverError, setServerError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -62,7 +62,8 @@ export const AssignmentEditor: React.FC = () => {
     creatorNameAr: currentUser.arabicName,
     creatorNameEn: currentUser.englishName,
     priority,
-    type: type || 'NORMAL',
+    type: types.includes('SOCIAL_MEDIA') ? 'SOCIAL_MEDIA' : 'NORMAL',
+    types,
     deadline: `${deadline} ${time.hour}:${time.minute} ${time.period}`,
     createdAt: new Date().toISOString(),
     isDraft,
@@ -118,7 +119,7 @@ export const AssignmentEditor: React.FC = () => {
           <TextField label={tx('عنوان التكليف','Assignment title')} value={titleAr} onChange={event => setTitleAr(event.target.value)} dir="rtl" requiredIndicator helperText={tx('اكتب العنوان بالعربية.','Enter the title in Arabic.')}/>
           <Textarea label={tx('وصف التكليف','Assignment description')} value={descriptionAr} onChange={event => setDescriptionAr(event.target.value)} dir="rtl" rows={3} helperText={tx('اكتب الوصف بالعربية.','Enter the description in Arabic.')}/>
           <label className="text-sm">{tx('الأولوية','Priority')}<select className="block w-full border rounded p-3 mt-1" value={priority} onChange={event => setPriority(event.target.value as TaskPriority)}>{[['LOW','منخفضة','Low'],['MEDIUM','متوسطة','Medium'],['HIGH','عالية','High'],['URGENT','عاجل','Urgent']].map(([value, arabic, english])=><option key={value} value={value}>{tx(arabic,english)}</option>)}</select></label>
-          <fieldset className="text-sm"><legend>{tx('نوع التكليف (اختياري)','Assignment type (optional)')}</legend><div className="mt-2 flex flex-wrap gap-3">{([['NORMAL',typeNames.normal],['SOCIAL_MEDIA',typeNames.socialMedia]] as const).map(([value,label])=><label key={value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-brand-border px-3 py-2"><input type="checkbox" checked={type===value} onChange={event=>setType(event.target.checked?value:type===value?'':type)}/>{label}</label>)}</div><p className="mt-1 text-xs text-brand-charcoal">{tx('يمكن ترك النوع دون تحديد أو اختيار نوع واحد.','Leave unselected or choose one type.')}</p></fieldset>
+          <fieldset className="text-sm"><legend>{tx('نوع التكليف (اختياري)','Assignment type (optional)')}</legend><div className="mt-2 flex flex-wrap gap-3">{([['MATERIALS_REQUIRED',typeNames.normal],['SOCIAL_MEDIA',typeNames.socialMedia]] as const).map(([value,label])=><label key={value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-brand-border px-3 py-2"><input type="checkbox" checked={types.includes(value)} onChange={event=>setTypes(current=>event.target.checked?[...new Set([...current,value])]:current.filter(item=>item!==value))}/>{label}</label>)}</div><p className="mt-1 text-xs text-brand-charcoal">{tx('يمكن اختيار النوعين معاً أو تركهما دون تحديد.','Select either or both types, or leave them unselected.')}</p></fieldset>
         </div>
       </Card>
 

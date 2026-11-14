@@ -74,7 +74,7 @@ router.get('/mine', async (request: AuthenticatedRequest, response) => {
 router.get('/department', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
   if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('view_department_work_logs')) {
-    response.status(403).json({ message: 'سجلات الموظفين متاحة للقراءة لمدير النظام ومدير الدائرة ونائبه.' });
+    response.status(403).json({ message: 'سجلات الموظفين متاحة للقراءة لمدير النظام ومدير القسم ونائبه.' });
     return;
   }
   try {
@@ -88,7 +88,7 @@ router.get('/department', async (request: AuthenticatedRequest, response) => {
     );
     response.json({ workLogs: result.rows.map(mapWorkLog) });
   } catch {
-    response.status(503).json({ message: 'تعذر تحميل سجلات الدائرة حالياً.' });
+    response.status(503).json({ message: 'تعذر تحميل سجلات القسم حالياً.' });
   }
 });
 
