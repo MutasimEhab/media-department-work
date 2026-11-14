@@ -380,7 +380,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setLanguage = (_lang: Language) => undefined;
 
   useEffect(() => {
-    document.documentElement.lang = 'ar';
+    document.documentElement.lang = 'ar-u-nu-latn';
     document.documentElement.dir = 'rtl';
   }, [language]);
 
