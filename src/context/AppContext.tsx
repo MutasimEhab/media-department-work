@@ -353,6 +353,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => { cancelled = true; };
   }, [isAuthenticated, currentUser.id, acceptNotifications]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    const refreshAssignments = async () => {
+      if (document.visibilityState === 'hidden') return;
+      try {
+        const response = await fetch('/api/assignments', { credentials: 'include', cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json() as { tasks?: Task[] };
+        if (!cancelled && payload.tasks) setTasks(payload.tasks);
+      } catch { /* Keep the most recent assignment data while offline. */ }
+    };
+    const interval = window.setInterval(() => void refreshAssignments(), 15_000);
+    const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refreshAssignments(); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [isAuthenticated, currentUser.id]);
+
   // The approved product interface is Arabic-only. Keep this compatibility
   // method for older components, but never switch the application locale.
   const setLanguage = (_lang: Language) => undefined;

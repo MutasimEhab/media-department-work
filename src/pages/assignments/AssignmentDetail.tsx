@@ -4,6 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { AssignmentProgress } from './AssignmentProgress';
 
 export const AssignmentDetail: React.FC<{review?: boolean}> = ({ review = false }) => {
   const { language, currentUser, tasks, updateTask, canAccess } = useApp();
@@ -49,7 +50,7 @@ export const AssignmentDetail: React.FC<{review?: boolean}> = ({ review = false 
 
     {!review&&mine&&<>
       <Card title={tx('تقدمك الشخصي','Your progress')}>
-        <div className="flex flex-wrap gap-2">{['Sent','Received','In Progress','Submitted','Approved'].map((status,index)=><span className={`rounded-full border px-3 py-2 ${(['RECEIVED','IN_PROGRESS','SUBMITTED','APPROVED'].indexOf(mine.status)>=index)?'border-brand-plum text-brand-plum':''}`} key={status}>{tx(['أرسل','استلم','قيد التنفيذ','تم التسليم','معتمد'][index],status)}</span>)}</div>
+        <AssignmentProgress statuses={[mine.status]} language={ar ? 'ar' : 'en'} />
         <div className="mt-4 flex flex-wrap gap-2">{mine.status==='RECEIVED'&&<Button disabled={saving} onClick={()=>setStatus('IN_PROGRESS')}>{tx('بدء العمل','Start work')}</Button>}{['IN_PROGRESS','RETURNED_FOR_REVISION'].includes(mine.status)&&<Button disabled={saving} onClick={()=>setModal(true)}>{tx('تسليم العمل','Submit work')}</Button>}</div>
         {saveError&&<p role="alert" className="mt-2 text-sm text-red-700">{saveError}</p>}
       </Card>

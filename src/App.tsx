@@ -59,7 +59,7 @@ export const App: React.FC = () => {
             <Route path="admin/add-work" element={<PermissionGuard permission="manage_users"><QuickWorkEntry /></PermissionGuard>} />
             <Route path="work" element={<PermissionGuard permission="view_own_work_logs"><WorkHistory /></PermissionGuard>} />
             <Route path="management/work-logs" element={<PermissionGuard permission="view_department_work_logs"><ManagementWorkLogs /></PermissionGuard>} />
-            <Route path="assignments" element={<PermissionGuard permission="view_assignments"><AssignmentList /></PermissionGuard>} />
+            <Route path="assignments" element={<PermissionGuard permission={['view_assignments','manage_assignments','review_assignments']}><AssignmentList /></PermissionGuard>} />
             <Route path="assignments/new" element={<PermissionGuard permission="manage_assignments"><AssignmentEditor /></PermissionGuard>} />
             <Route path="assignments/:id/edit" element={<PermissionGuard permission="manage_assignments"><AssignmentEditor /></PermissionGuard>} />
             <Route path="assignments/:id/review" element={<PermissionGuard permission="review_assignments"><AssignmentDetail review /></PermissionGuard>} />

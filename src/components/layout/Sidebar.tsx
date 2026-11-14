@@ -84,7 +84,7 @@ export const Sidebar: React.FC = () => {
       label: role === 'EMPLOYEE' ? t.nav.myAssignments : t.nav.assignments,
       icon: <ClipboardList className="w-5 h-5" />,
       roles: ['ADMIN', 'MANAGER', 'DEPUTY', 'EMPLOYEE'],
-      permission: 'view_assignments',
+      permission: ['view_assignments', 'manage_assignments', 'review_assignments'],
     },
     {
       to: '/app/projects',
