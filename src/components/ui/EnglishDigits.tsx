@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useEffect } from 'react';
 
 const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
 const hasNonLatinDigits = /[٠-٩۰-۹]/;
@@ -10,7 +10,7 @@ export const toEnglishDigits = (value: string) => value.replace(ARABIC_DIGITS, d
 
 /** Enforces Latin digits in rendered text, dynamic values, and localized browser controls. */
 export function EnglishDigits() {
-  useLayoutEffect(() => {
+  useEffect(() => {
     document.documentElement.lang = 'ar-u-nu-latn';
 
     const isProtectedInput = (element: HTMLInputElement) =>
@@ -61,21 +61,6 @@ export function EnglishDigits() {
       }
     };
 
-    // Patch DOM value setters so values loaded or updated programmatically stay Latin too.
-    const restoreSetters: Array<() => void> = [];
-    for (const prototype of [HTMLInputElement.prototype, HTMLTextAreaElement.prototype, HTMLSelectElement.prototype]) {
-      const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-      if (!descriptor?.get || !descriptor.set || !descriptor.configurable) continue;
-      Object.defineProperty(prototype, 'value', {
-        ...descriptor,
-        set(this: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
-          const normalized = this instanceof HTMLInputElement && isProtectedInput(this) ? value : toEnglishDigits(String(value));
-          descriptor.set!.call(this, normalized);
-        },
-      });
-      restoreSetters.push(() => Object.defineProperty(prototype, 'value', descriptor));
-    }
-
     updateText(document.body);
     const onInput = (event: Event) => {
       if (event.target instanceof Element) convertControlValue(event.target);
@@ -99,7 +84,6 @@ export function EnglishDigits() {
     return () => {
       observer.disconnect();
       document.removeEventListener('input', onInput, true);
-      restoreSetters.forEach(restore => restore());
     };
   }, []);
   return null;
