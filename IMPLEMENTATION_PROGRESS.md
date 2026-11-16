@@ -1,5 +1,9 @@
 # UI implementation progress
 
+> **Status note (2026-11-16):** The entries below are a historical implementation log and include prototype-era statements that are no longer current. The production site is deployed on Vercel and `/api/health` was previously confirmed to return `database: connected`. Work logs, users, assignments, projects, circulars, notifications, reports, and system settings have database-backed routes. This is not a formal production-readiness approval: role-by-role end-to-end acceptance and a database backup/restore drill remain outstanding. The backup screen in the app exports browser-local settings only; it does not back up Neon. Email and SMS delivery are not configured. The idle-session setting was stored but not previously enforced; the current code now reads it for server-side inactivity checks.
+
+Keep this status note current. Treat the older prompt-by-prompt notes below as historical context, not a statement of today's deployment status.
+
 - Prompt 00: Existing foundation retained.
 - Prompt 01: Existing shell and component showcase retained.
 - Prompt 02: Implemented login, recovery request, one-time mock reset; Arabic/English; five-attempt per-email lock for 15 minutes; inactive account rejection; mock user selection; 10-character minimum reset password.

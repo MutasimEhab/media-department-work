@@ -6,7 +6,7 @@ import { db } from '../db.js';
 const router = Router();
 const SESSION_COOKIE = 'media_dept_session';
 const SESSION_LIFETIME_MS = 12 * 60 * 60 * 1000;
-const IDLE_TIMEOUT_MINUTES = 30;
+const DEFAULT_IDLE_TIMEOUT_MINUTES = 30;
 const BCRYPT_ROUNDS = 12;
 
 type RoleCode = 'system_admin' | 'department_manager' | 'deputy_manager' | 'employee';
@@ -106,7 +106,7 @@ function readSessionToken(request: Request): string | undefined {
 function setSessionCookie(response: Response, token: string): void {
   response.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.NODE_ENV === 'production' || process.env.VERCEL === '1',
     sameSite: 'lax',
     path: '/',
     maxAge: SESSION_LIFETIME_MS,
@@ -116,7 +116,7 @@ function setSessionCookie(response: Response, token: string): void {
 function clearSessionCookie(response: Response): void {
   response.clearCookie(SESSION_COOKIE, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.NODE_ENV === 'production' || process.env.VERCEL === '1',
     sameSite: 'lax',
     path: '/',
   });
@@ -204,11 +204,17 @@ export async function authenticateRequest(request: Request): Promise<Authenticat
         AND s.user_id = u.id
         AND s.revoked_at IS NULL
         AND s.expires_at > now()
-        AND s.last_seen_at > now() - ($2::text || ' minutes')::interval
+        AND s.last_seen_at > now() - (
+          COALESCE(
+            (SELECT NULLIF(value->>'sessionMinutes', '')::integer
+               FROM system_settings WHERE key = 'institutional'),
+            $2::integer
+          ) * interval '1 minute'
+        )
         AND u.is_active = true
       RETURNING u.id, u.role_code AS "roleCode", u.account_type_code AS "accountTypeCode", u.department_id AS "departmentId",
                 u.username, u.email, u.full_name_ar AS "fullNameAr", s.id AS session_id`,
-    [tokenHash, IDLE_TIMEOUT_MINUTES],
+    [tokenHash, DEFAULT_IDLE_TIMEOUT_MINUTES],
   );
   const row = result.rows[0];
   return row ? {
