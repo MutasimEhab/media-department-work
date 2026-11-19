@@ -13,6 +13,7 @@ type Settings = {
   smsNotificationsEnabled: boolean; sessionMinutes: number; language: 'ar'; organizationLogo?: string | null;
   assignmentTypeNames: { normal: string; socialMedia: string };
   notificationSound: string;
+  projectCodePrefix: string;
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS: Settings = {
   taskReminderHours: [24, 2], missingWorkAlertsEnabled: true, missingWorkAlertTime: '15:00',
   smsNotificationsEnabled: false, sessionMinutes: 30, language: 'ar', organizationLogo: null,
   assignmentTypeNames: { normal: 'مطلوب مواد للمؤسسة / جهات المانحة', socialMedia: 'سوشيال ميديا' }, notificationSound: 'soft-bell',
+  projectCodePrefix: 'PRJ',
 };
 
 const ROLES: { id: UserRole; label: string }[] = [
@@ -43,7 +45,7 @@ export const SystemSettings: React.FC = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingRolePermission, setSavingRolePermission] = useState(false);
   const [error, setError] = useState('');
-  const [section, setSection] = useState<'organization'|'work'|'scoring'|'reminders'|'security'|'permissions'|'assignmentTypes'>('organization');
+  const [section, setSection] = useState<'organization'|'work'|'scoring'|'reminders'|'security'|'permissions'|'assignmentTypes'|'projects'>('organization');
   const weightTotal = settings.weights.completion + settings.weights.timeliness + settings.weights.communication;
 
   useEffect(() => { setSaved(false); }, [settings]);
@@ -74,6 +76,7 @@ export const SystemSettings: React.FC = () => {
   async function saveSettings(event: React.FormEvent) {
     event.preventDefault();
     if (!settings.institution.trim() || !settings.department.trim()) { setError('أدخل اسم المؤسسة والقسم.'); return; }
+    if (!/^[A-Za-z\u0621-\u064A]{1,5}$/.test(settings.projectCodePrefix.trim())) { setError('اكتب بادئة رمز المشروع بحرف واحد إلى خمسة أحرف.'); return; }
     if (weightTotal !== 100) { setError('يجب أن يساوي مجموع أوزان التقييم 100٪.'); return; }
     if (!settings.workdays.length) { setError('اختر يوم عمل واحدًا على الأقل.'); return; }
     setSavingSettings(true);
@@ -120,7 +123,7 @@ export const SystemSettings: React.FC = () => {
   const tabs = [
     ['organization','بيانات المؤسسة'], ['work','الدوام وساعات العمل'],
     ['scoring','معايير التقييم'], ['reminders','التنبيهات'], ['security','الأمان والجلسات'], ['permissions','مصفوفة الصلاحيات'],
-    ['assignmentTypes','أنواع التكليفات'],
+    ['assignmentTypes','أنواع التكليفات'], ['projects','إعدادات المشاريع'],
   ] as const;
 
   return <main className="mx-auto max-w-6xl space-y-5" dir="rtl">
@@ -171,6 +174,7 @@ export const SystemSettings: React.FC = () => {
       </Card>
       </>}
       {section==='work'&&<Card title="أيام وساعات الدوام الرسمي"><fieldset><legend className="mb-2 text-sm font-semibold">أيام العمل</legend><div className="flex flex-wrap gap-3">{WORKDAYS.map(day=><label key={day} className="flex items-center gap-2 rounded-lg border border-brand-border px-3 py-2"><input type="checkbox" checked={settings.workdays.includes(day)} onChange={e=>setSettings(s=>({...s,workdays:e.target.checked?[...s.workdays,day]:s.workdays.filter(value=>value!==day)}))}/>{day}</label>)}</div></fieldset><div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">بداية الدوام<input type="time" dir="ltr" className="mt-1 block rounded-input border border-brand-border p-3 font-normal" value={settings.startTime} onChange={e=>setSettings(s=>({...s,startTime:e.target.value}))}/></label><label className="text-sm font-semibold">نهاية الدوام<input type="time" dir="ltr" className="mt-1 block rounded-input border border-brand-border p-3 font-normal" value={settings.endTime} onChange={e=>setSettings(s=>({...s,endTime:e.target.value}))}/></label></div><p className="mt-3 text-xs text-brand-charcoal">تُحفظ الإعدادات مركزياً في قاعدة البيانات وتُحمّل عند تسجيل الدخول.</p></Card>}
+      {section==='projects'&&<Card title="ترقيم المشاريع"><label className="block max-w-md text-sm font-semibold">بادئة رقم المشروع<input dir="ltr" maxLength={5} pattern="[A-Za-zء-ي]{1,5}" className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" value={settings.projectCodePrefix} onChange={e=>setSettings(s=>({...s,projectCodePrefix:e.target.value}))}/></label><p className="mt-3 text-sm text-brand-charcoal">يُنشئ النظام رقماً تسلسلياً تلقائياً لكل مشروع جديد. مثال: <b dir="ltr">{settings.projectCodePrefix.trim()||'PRJ'}-0001</b>. تغيير البادئة يؤثر على المشاريع الجديدة فقط، ولا يغيّر أرقام المشاريع السابقة.</p></Card>}
       {section==='scoring'&&<Card title="أوزان مؤشرات الأداء"><p className="mb-4 text-sm">يجب أن يساوي مجموع الأوزان 100٪.</p><div className="grid gap-4 sm:grid-cols-3">{([['completion','إنجاز الأعمال'],['timeliness','الالتزام بالمواعيد'],['communication','المخرجات الإعلامية']] as const).map(([key,label])=><label key={key} className="text-sm font-semibold">{label} (%)<input type="number" min="0" max="100" className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" value={settings.weights[key]} onChange={e=>setSettings(s=>({...s,weights:{...s.weights,[key]:Number(e.target.value)}}))}/></label>)}</div><p className={`mt-3 font-bold ${weightTotal===100?'text-green-700':'text-red-700'}`}>المجموع: {weightTotal}٪</p></Card>}
       {section==='reminders'&&<Card title="سياسة التنبيهات"><div className="space-y-5"><section className="rounded-lg border border-brand-border p-4"><label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={settings.missingWorkAlertsEnabled} onChange={e=>setSettings(s=>({...s,missingWorkAlertsEnabled:e.target.checked}))}/>تنبيه الموظف عند عدم تسجيل العمل اليومي</label><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-sm">موعد فحص السجلات وإرسال التنبيه<input type="time" dir="ltr" className="mt-1 block rounded-input border border-brand-border p-3" value={settings.missingWorkAlertTime} onChange={e=>setSettings(s=>({...s,missingWorkAlertTime:e.target.value}))}/></label><p className="self-end text-sm">يُفحص الموظفون النشطون في أيام الدوام المحددة. يُرسل تذكير للموظف وتنبيه متابعة للمستخدمين المخولين.</p></div><p className="mt-3 text-xs text-brand-charcoal">حدّد المستلمين من مصفوفة الصلاحيات عبر صلاحية «استلام تنبيهات عدم تسجيل العمل اليومي».</p></section><section><p className="mb-3 text-sm font-semibold">مواعيد التذكير بالتكليف قبل الاستحقاق</p><div className="flex flex-wrap gap-3">{[24,2].map(hours=><label key={hours} className="flex items-center gap-2 rounded-lg border border-brand-border px-3 py-2"><input type="checkbox" checked={settings.taskReminderHours.includes(hours)} onChange={e=>setSettings(s=>({...s,taskReminderHours:e.target.checked?[...s.taskReminderHours,hours]:s.taskReminderHours.filter(value=>value!==hours)}))}/>{hours===24?'قبل 24 ساعة':'قبل ساعتين'}</label>)}</div><p className="mt-2 text-sm">تذكير يومي بعد تجاوز الموعد · إقرار التعميم بعد 24 ساعة ثم كل 48 ساعة، بحد أقصى 3 تذكيرات.</p></section><section className="rounded-lg border border-brand-border p-4"><label className="block text-sm font-semibold">صوت الإشعار<select className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" value={settings.notificationSound} onChange={e=>setSettings(s=>({...s,notificationSound:e.target.value}))}><option value="soft-bell">جرس هادئ</option><option value="clear-chime">رنين واضح</option><option value="gentle-pop">نغمة خفيفة</option><option value="silent">بدون صوت</option></select></label><p className="mt-2 text-xs text-brand-charcoal">تظهر إشعارات الموقع فور وصولها. لتشغيل الصوت اسمح بتفاعل المتصفح أولاً؛ قد يمنع المتصفح التشغيل التلقائي قبل أول نقرة.</p><Button type="button" variant="outline" className="mt-3" onClick={()=>playNotificationSound(settings.notificationSound)}>تجربة الصوت المختار</Button></section><section className="rounded-lg border border-brand-border bg-brand-lightGray/30 p-4"><label className="flex items-center gap-2 text-sm text-brand-charcoal"><input type="checkbox" checked={settings.smsNotificationsEnabled} disabled/>تفعيل إرسال التنبيهات عبر الرسائل النصية (SMS)</label><p className="mt-2 text-xs text-brand-charcoal">القناة جاهزة للإعداد لاحقًا، لكنها غير مفعّلة حتى ربط مزوّد رسائل ومفاتيح الإرسال بالخادم.</p><p className="mt-1 text-xs text-brand-charcoal">التنبيهات الحالية تظهر داخل الموقع فقط، ولا يتم إرسال رسائل فعلية.</p></section></div></Card>}
       {section==='security'&&<Card title="ضوابط الأمان والجلسات"><label className="block max-w-sm text-sm font-semibold">مدة الخمول قبل انتهاء الجلسة (دقيقة)<input type="number" min="5" max="240" className="mt-1 block w-full rounded-input border border-brand-border p-3 font-normal" value={settings.sessionMinutes} onChange={e=>setSettings(s=>({...s,sessionMinutes:Number(e.target.value)}))}/></label><div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm"><b>حالة التطبيق</b><p className="mt-1">تُحفظ قيمة مدة الجلسة مركزياً. تطبيقها على جلسات الدخول نفسها وإرسال SMS يحتاجان إعداداً إضافياً في الخادم ومزوّد الرسائل.</p></div></Card>}

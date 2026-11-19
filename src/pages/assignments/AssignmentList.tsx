@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpLeft, CalendarClock, ClipboardList, Search, UsersRound } from 'lucide-react';
+import { ArrowUpLeft, CalendarClock, ClipboardList, Search, UsersRound, Pencil, Trash2 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useApp } from '../../context/AppContext';
@@ -30,7 +30,7 @@ const filterLabels: Record<StatusFilter, string> = {
 };
 
 export const AssignmentList: React.FC = () => {
-  const { currentUser, tasks, users, canAccess } = useApp();
+  const { currentUser, tasks, users, canAccess, deleteTask } = useApp();
   const manager = canAccess('manage_assignments');
   const reviewer = canAccess('review_assignments');
   const canViewAssignments = canAccess('view_assignments');
@@ -113,7 +113,15 @@ export const AssignmentList: React.FC = () => {
               <Link className="text-lg font-bold text-brand-darkText decoration-brand-plum underline-offset-4 hover:text-brand-plum hover:underline" to={detailsUrl}>{task.titleAr || 'تكليف بلا عنوان'}</Link>
               {task.descriptionAr && <p className="mt-1 line-clamp-2 text-sm text-brand-charcoal">{task.descriptionAr}</p>}
             </div>
-            <Link to={detailsUrl}><Button variant="outline" size="sm" rightIcon={<ArrowUpLeft size={15} />}>{reviewer && !canViewAssignments ? 'مراجعة التسليم' : 'التفاصيل'}</Button></Link>
+            <div className="flex flex-wrap gap-2">
+              {manager && (currentUser.role === 'ADMIN' || task.creatorId === currentUser.id) && <>
+                <Link to={`/app/assignments/${task.id}/edit`}><Button variant="outline" size="sm" leftIcon={<Pencil size={14}/>} >تعديل</Button></Link>
+                <Button variant="danger" size="sm" leftIcon={<Trash2 size={14}/>} onClick={() => {
+                  if (window.confirm(`هل تريد إلغاء التكليف «${task.titleAr}»؟ سيصل إشعار للمستلمين وسيبقى محفوظاً في سجل النظام.`)) void deleteTask(task.id);
+                }}>إلغاء التكليف</Button>
+              </>}
+              <Link to={detailsUrl}><Button variant="outline" size="sm" rightIcon={<ArrowUpLeft size={15} />}>{reviewer && !canViewAssignments ? 'مراجعة التسليم' : 'التفاصيل'}</Button></Link>
+            </div>
           </div>
 
           <div className="grid gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.7fr)]">

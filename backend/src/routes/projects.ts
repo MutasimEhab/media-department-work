@@ -19,7 +19,7 @@ function validDate(value: unknown): value is string {
 
 function mapProject(row: Record<string, any>, stages: Array<Record<string, any>>) {
   return {
-    id: row.id, titleAr: row.title_ar, titleEn: row.title_ar,
+    id: row.id, projectCode: row.project_code, titleAr: row.title_ar, titleEn: row.title_ar,
     descriptionAr: row.description_ar, descriptionEn: row.description_ar,
     ownerId: row.owner_id, ownerNameAr: row.owner_name, ownerNameEn: row.owner_name,
     status: dbStatusToUi[row.status] ?? 'IN_PROGRESS',
@@ -49,7 +49,7 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
   }
   try {
     const result = await db.query(
-      `SELECT p.id, p.title_ar, p.description_ar, p.status, p.start_date, p.expected_end_date,
+      `SELECT p.id, p.project_code, p.title_ar, p.description_ar, p.status, p.start_date, p.expected_end_date,
               p.assignment_id, p.owner_id, owner.full_name_ar AS owner_name,
               COALESCE((SELECT json_agg(pm.user_id) FROM project_members pm WHERE pm.project_id = p.id), '[]'::json) AS member_ids
          FROM projects p JOIN users owner ON owner.id = p.owner_id
@@ -117,10 +117,20 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
         return;
       }
     }
+    const settingsResult = await client.query<{ value: { projectCodePrefix?: unknown } | null }>(
+      "SELECT value FROM system_settings WHERE key = 'institutional'",
+    );
+    const configuredPrefix = settingsResult.rows[0]?.value?.projectCodePrefix;
+    const projectPrefix = typeof configuredPrefix === 'string' && /^[A-Za-z\u0621-\u064A]{1,5}$/.test(configuredPrefix.trim())
+      ? configuredPrefix.trim().toUpperCase() : 'PRJ';
+    const sequenceResult = await client.query<{ sequence_number: string }>(
+      "SELECT nextval('project_code_sequence')::text AS sequence_number",
+    );
+    const projectCode = `${projectPrefix}-${sequenceResult.rows[0]!.sequence_number.padStart(4, '0')}`;
     const created = await client.query<{ id: string }>(
-      `INSERT INTO projects (department_id, created_by, owner_id, assignment_id, title_ar, description_ar, status, start_date, expected_end_date)
-       VALUES ($1, $2, $3, $4, $5, $6, 'in_progress', $7, $8) RETURNING id`,
-      [owner.department_id, actor.id, ownerId, assignmentId, title, description, startDate, endDate],
+      `INSERT INTO projects (department_id, created_by, owner_id, assignment_id, project_code, title_ar, description_ar, status, start_date, expected_end_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'in_progress', $8, $9) RETURNING id`,
+      [owner.department_id, actor.id, ownerId, assignmentId, projectCode, title, description, startDate, endDate],
     );
     const projectId = created.rows[0]!.id;
     await client.query('INSERT INTO project_members (project_id, user_id, added_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [projectId, ownerId, actor.id]);
@@ -136,7 +146,7 @@ router.post('/', async (request: AuthenticatedRequest, response) => {
     );
     await client.query('COMMIT');
     response.status(201).json({ project: {
-      id: projectId, titleAr: title, titleEn: title, descriptionAr: description, descriptionEn: description,
+      id: projectId, projectCode, titleAr: title, titleEn: title, descriptionAr: description, descriptionEn: description,
       ownerId, ownerNameAr: owner.full_name_ar, ownerNameEn: owner.full_name_ar, status: 'IN_PROGRESS',
       startedAt: startDate ?? undefined, expectedEndDate: endDate ?? undefined, relatedTaskId: assignmentId ?? undefined,
       memberIds: [ownerId], stages: [],

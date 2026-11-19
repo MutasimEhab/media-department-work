@@ -19,6 +19,8 @@ export const ProjectWorkspace: React.FC = () => {
   const [owner, setOwner] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
+  const [startFrom, setStartFrom] = useState('');
+  const [endBefore, setEndBefore] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [newOwner, setNewOwner] = useState(currentUser.role === 'EMPLOYEE' ? currentUser.id : users.find(user => user.role === 'EMPLOYEE' && user.isActive)?.id || '');
@@ -31,7 +33,9 @@ export const ProjectWorkspace: React.FC = () => {
     (manager || project.ownerId === currentUser.id || project.memberIds?.includes(currentUser.id)) &&
     (!owner || project.ownerId === owner) &&
     (!status || project.status === status) &&
-    (!search || `${project.titleAr} ${project.titleEn}`.toLowerCase().includes(search.toLowerCase()))
+    (!search || `${project.projectCode || ''} ${project.titleAr} ${project.titleEn}`.toLowerCase().includes(search.toLowerCase())) &&
+    (!startFrom || Boolean(project.startedAt && project.startedAt >= startFrom)) &&
+    (!endBefore || Boolean(project.expectedEndDate && project.expectedEndDate <= endBefore))
   );
 
   if (id === 'new') return <main className="max-w-3xl mx-auto space-y-4">
@@ -41,7 +45,7 @@ export const ProjectWorkspace: React.FC = () => {
         event.preventDefault();
         if (!title.trim()) return;
         const user = users.find(candidate => candidate.id === newOwner) || currentUser;
-        const projectId = `PRJ-${204 + projects.length - 3}`;
+        const projectId = `TEMP-PROJECT-${Date.now()}`;
         const result = await updateProjects(items => [...items, {
           id: projectId,
           titleAr: title.trim(), titleEn: title.trim(),
@@ -71,7 +75,7 @@ export const ProjectWorkspace: React.FC = () => {
     const completed = selected.stages.filter(stage=>stage.isCompleted).length;
     return <main className="mx-auto max-w-3xl space-y-4">
       <Link to="/app/projects" className="text-sm font-bold text-brand-plum underline">{tx('العودة إلى المشاريع','Back to projects')}</Link>
-      <Card title={ar?selected.titleAr:selected.titleEn} subtitle={`${selected.id} · ${projectStatusLabels[selected.status]||'غير محدد'}`}>
+      <Card title={ar?selected.titleAr:selected.titleEn} subtitle={`${selected.projectCode || selected.id} · ${projectStatusLabels[selected.status]||'غير محدد'}`}>
         <p>{ar?selected.descriptionAr:selected.descriptionEn}</p><p className="mt-2">{tx('المالك','Owner')}: {ar?selected.ownerNameAr:selected.ownerNameEn}</p><p>{tx('الموعد المتوقع','Expected end')}: {selected.expectedEndDate||'—'}</p>
         {selected.relatedTaskId&&<Link className="mt-2 inline-block text-brand-plum underline" to={`/app/assignments/${selected.relatedTaskId}`}>{tx('التكليف المرتبط','Linked assignment')} {selected.relatedTaskId}</Link>}
         <div className="mt-4 h-3 rounded-full bg-brand-lightGray"><div className="h-3 rounded-full bg-brand-plum" style={{width:`${selected.stages.length?completed/selected.stages.length*100:0}%`}}/></div><p className="mt-2 text-sm">{completed} {tx('من','of')} {selected.stages.length} {tx('مراحل مكتملة','stages completed')}</p>
@@ -85,8 +89,8 @@ export const ProjectWorkspace: React.FC = () => {
   }
 
   return <main className="space-y-5"><header className="app-page-heading flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold mt-2">{tx('المشاريع','Projects')}</h1><p>{tx('تابع المشاريع والمراحل ونسبة الإنجاز.','Track projects, stages, and progress.')}</p></div>{manager&&<Link to="/app/projects/new"><Button>{tx('مشروع جديد','New project')}</Button></Link>}</header>
-      <Card><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><input className="rounded-input border border-brand-border p-2.5" placeholder={tx('بحث باسم المشروع','Search projects')} value={search} onChange={event=>setSearch(event.target.value)} dir="rtl"/><select className="rounded-input border border-brand-border p-2.5" value={owner} onChange={event=>setOwner(event.target.value)}><option value="">{tx('كل الملاك','All owners')}</option>{users.filter(user=>user.role==='EMPLOYEE').map(user=><option key={user.id} value={user.id}>{user.arabicName}</option>)}</select><select className="rounded-input border border-brand-border p-2.5" value={status} onChange={event=>setStatus(event.target.value)}><option value="">{tx('كل الحالات','All statuses')}</option>{['IN_PROGRESS','COMPLETED','CLOSED','ON_HOLD'].map(value=><option key={value} value={value}>{projectStatusLabels[value]}</option>)}</select><Button size="sm" variant="ghost" onClick={()=>{setSearch('');setOwner('');setStatus('')}}>{tx('مسح الفلاتر','Reset filters')}</Button></div></Card>
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{scoped.map(project=><Link to={`/app/projects/${project.id}`} key={project.id}><Card className="h-full hover:border-brand-plum" title={project.titleAr} subtitle={`${project.id} · ${projectStatusLabels[project.status]||'غير محدد'}`}><p>المالك: {project.ownerNameAr}</p><div className="mt-3 h-2 rounded-full bg-brand-lightGray"><div className="h-2 rounded-full bg-brand-plum" style={{width:`${project.stages.length?project.stages.filter(stage=>stage.isCompleted).length/project.stages.length*100:0}%`}}/></div><p className="mt-2 text-sm">{project.stages.filter(stage=>stage.isCompleted).length} من {project.stages.length} مراحل مكتملة</p><p className="text-xs text-brand-charcoal/70">النهاية المتوقعة: {project.expectedEndDate||'—'}</p></Card></Link>)}</section>
+      <Card><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"><input className="rounded-input border border-brand-border p-2.5" placeholder={tx('بحث برقم المشروع أو اسمه','Search by project number or name')} value={search} onChange={event=>setSearch(event.target.value)} dir="rtl"/><select className="rounded-input border border-brand-border p-2.5" value={owner} onChange={event=>setOwner(event.target.value)}><option value="">{tx('كل الملاك','All owners')}</option>{users.filter(user=>user.role==='EMPLOYEE').map(user=><option key={user.id} value={user.id}>{user.arabicName}</option>)}</select><select className="rounded-input border border-brand-border p-2.5" value={status} onChange={event=>setStatus(event.target.value)}><option value="">{tx('كل الحالات','All statuses')}</option>{['IN_PROGRESS','COMPLETED','CLOSED','ON_HOLD'].map(value=><option key={value} value={value}>{projectStatusLabels[value]}</option>)}</select><label className="text-xs font-semibold text-brand-charcoal">{tx('تاريخ البداية من','Start date from')}<EnglishDateInput className="mt-1" value={startFrom} onChange={setStartFrom} ariaLabel="تاريخ البداية من"/></label><label className="text-xs font-semibold text-brand-charcoal">{tx('الانتهاء المتوقع حتى','Expected end by')}<EnglishDateInput className="mt-1" value={endBefore} onChange={setEndBefore} ariaLabel="الانتهاء المتوقع حتى"/></label><Button size="sm" variant="ghost" onClick={()=>{setSearch('');setOwner('');setStatus('');setStartFrom('');setEndBefore('')}}>{tx('مسح الفلاتر','Reset filters')}</Button></div></Card>
+    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{scoped.map(project=><Link to={`/app/projects/${project.id}`} key={project.id}><Card className="h-full hover:border-brand-plum" title={project.titleAr} subtitle={`${project.projectCode || project.id} · ${projectStatusLabels[project.status]||'غير محدد'}`}><p>المالك: {project.ownerNameAr}</p><div className="mt-3 h-2 rounded-full bg-brand-lightGray"><div className="h-2 rounded-full bg-brand-plum" style={{width:`${project.stages.length?project.stages.filter(stage=>stage.isCompleted).length/project.stages.length*100:0}%`}}/></div><p className="mt-2 text-sm">{project.stages.filter(stage=>stage.isCompleted).length} من {project.stages.length} مراحل مكتملة</p><p className="text-xs text-brand-charcoal/70">النهاية المتوقعة: {project.expectedEndDate||'—'}</p></Card></Link>)}</section>
     {!scoped.length&&<Card>{tx('لا توجد مشاريع مطابقة.','No matching projects.')}</Card>}
   </main>;
 };

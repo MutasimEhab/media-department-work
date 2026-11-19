@@ -81,6 +81,7 @@ export interface ProjectStage {
 
 export interface Project {
   id: string; // PRJ-201
+  projectCode?: string;
   titleAr: string;
   titleEn: string;
   descriptionAr: string;

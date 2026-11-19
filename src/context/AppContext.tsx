@@ -53,6 +53,7 @@ interface AppContextType {
   deleteWorkLog: (id: string) => Promise<{ ok: boolean; message?: string }>;
   saveTask: (task: Task) => Promise<{ ok: boolean; message?: string }>;
   sendTask: (task: Task) => Promise<{ ok: boolean; message?: string }>;
+  deleteTask: (taskId: string) => Promise<{ ok: boolean; message?: string }>;
   updateTask: (taskId: string, update: (task: Task) => Task) => Promise<{ ok: boolean; message?: string }>;
   updateProjects: (update: (projects: Project[]) => Project[]) => Promise<{ ok: boolean; message?: string }>;
   saveCircular: (circular: Circular, publish: boolean) => Promise<{ ok: boolean; circular?: Circular; message?: string }>;
@@ -601,7 +602,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           titleAr: task.titleAr, descriptionAr: task.descriptionAr, priority: task.priority,
-          type: task.type, deadline: task.deadline, isDraft: task.isDraft,
+          type: task.type, types: task.types, deadline: task.deadline, isDraft: task.isDraft,
           assigneeIds: task.recipients.map(recipient => recipient.userId),
           referenceUrl: task.referenceUrl, reminderOptions: task.reminderOptions,
           emailDelivery: task.emailDelivery, smsDelivery: task.smsDelivery,
@@ -624,7 +625,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { ok: false, message };
     }
   };
-  const saveTask = (task: Task) => persistTask({ ...task, isDraft: true });
+  const saveTask = (task: Task) => persistTask(task);
 
   const sendTask = async (task: Task) => {
     const result = await persistTask({ ...task, isDraft: false });
@@ -637,6 +638,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch { /* Notification polling will refresh the list; assignment send already succeeded. */ }
     return { ok: true };
+  };
+  const deleteTask = async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/assignments/${encodeURIComponent(taskId)}`, { method: 'DELETE', credentials: 'include' });
+      const payload = await response.json() as { message?: string };
+      if (!response.ok) throw new Error(payload.message || 'تعذر إلغاء التكليف.');
+      setTasks(previous => previous.filter(task => task.id !== taskId));
+      notify('تم إلغاء التكليف وإشعار المستلمين.', 'success');
+      return { ok: true };
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم؛ لم يُلغَ التكليف.';
+      notify(message, 'error');
+      return { ok: false, message };
+    }
   };
   const updateTask = async (taskId: string, update: (task: Task) => Task) => {
     const existing = tasks.find(task => task.id === taskId);
@@ -874,6 +889,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteWorkLog,
         saveTask,
         sendTask,
+        deleteTask,
         updateTask,
         updateProjects,
         saveCircular,

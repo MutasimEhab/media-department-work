@@ -27,6 +27,7 @@ export const AssignmentEditor: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const base = tasks.find(task => task.id === id);
+  const editingPublished = Boolean(base && !base.isDraft);
   const [titleAr, setTitleAr] = useState(base?.titleAr || '');
   const [descriptionAr, setDescriptionAr] = useState(base?.descriptionAr || '');
   const [priority, setPriority] = useState<TaskPriority>(base?.priority || 'MEDIUM');
@@ -92,15 +93,17 @@ export const AssignmentEditor: React.FC = () => {
   }
 
   async function submit(send: boolean) {
-    if (busy || sentOnce.current || !validate(send)) return;
-    const confirmed = window.confirm(send
+    if (busy || sentOnce.current || !validate(send || editingPublished)) return;
+    const confirmed = window.confirm(editingPublished
+      ? tx('حفظ تعديلات التكليف وإشعار المستلمين؟', 'Save the assignment changes and notify its recipients?')
+      : send
       ? tx(`إرسال التكليف إلى ${assignees.length} موظف؟ سيصل إشعار داخلي إلى كل مستلم.`, `Send this assignment to ${assignees.length} employee(s)? Each recipient will receive an internal notification.`)
       : tx('حفظ محتوى التكليف كمسودة؟', 'Save assignment content as a draft?'));
     if (!confirmed) return;
     setBusy(true);
-    const task = makeTask(!send);
+    const task = makeTask(editingPublished ? false : !send);
     setServerError('');
-    const result = send ? await sendTask(task) : await saveTask(task);
+    const result = send && !editingPublished ? await sendTask(task) : await saveTask(task);
     if (!result.ok) { setBusy(false); setServerError(result.message || 'تعذر حفظ التكليف.'); return; }
     if (send) sentOnce.current = true;
     setBusy(false);
@@ -109,7 +112,7 @@ export const AssignmentEditor: React.FC = () => {
 
   return <main className="max-w-4xl mx-auto space-y-5">
     <header className="app-page-heading">
-      <h1 className="text-2xl font-bold mt-2">{id ? tx('تعديل مسودة التكليف', 'Edit assignment draft') : tx('إنشاء تكليف', 'Create assignment')}</h1>
+      <h1 className="text-2xl font-bold mt-2">{editingPublished ? tx('تعديل التكليف', 'Edit assignment') : id ? tx('تعديل مسودة التكليف', 'Edit assignment draft') : tx('إنشاء تكليف', 'Create assignment')}</h1>
       <p>{tx('أدخل بيانات التكليف باللغة العربية. يمكن تغيير لغة عرض الواجهة دون ترجمة النص الذي تكتبه.', 'Enter assignment content in Arabic. Changing the display language does not translate your text.')}</p>
     </header>
 
@@ -126,12 +129,12 @@ export const AssignmentEditor: React.FC = () => {
       <Card title={tx('2. الموعد والمستلمون','2. Deadline and recipients')}>
         <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm">{tx('تاريخ الاستحقاق','Due date')}<EnglishDateInput className="mt-1 bg-white" ariaLabel={tx('تاريخ الاستحقاق','due date')} min={minDate} value={deadline} onChange={setDeadline} required/></label><fieldset><legend className="text-sm">{tx('وقت الاستحقاق (12 ساعة)','Due time (12-hour)')}</legend><div className="mt-1 flex gap-2" dir="ltr"><select aria-label="Hour" className="min-w-0 flex-1 rounded border p-3" value={time.hour} onChange={event=>setTime(current=>({...current,hour:event.target.value}))}>{Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')).map(hour=><option key={hour}>{hour}</option>)}</select><span className="self-center">:</span><select aria-label="Minute" className="min-w-0 flex-1 rounded border p-3" value={time.minute} onChange={event=>setTime(current=>({...current,minute:event.target.value}))}>{Array.from({length:60},(_,i)=>String(i).padStart(2,'0')).map(minute=><option key={minute}>{minute}</option>)}</select><select aria-label="AM or PM" className="rounded border p-3" value={time.period} onChange={event=>setTime(current=>({...current,period:event.target.value as 'AM'|'PM'}))}><option value="AM">AM</option><option value="PM">PM</option></select></div></fieldset></div>
         <p className="text-xs mt-2">{tx(`أقرب تاريخ متاح: ${minDate} (بعد تاريخ اليوم ${today}).`, `Earliest allowed date: ${minDate} (after today ${today}).`)}</p>
-        <div className="mt-4"><MultiSelect label={tx('الموظفون المكلفون','Assigned employees')} options={recipientOptions} value={assignees} onChange={setAssignees} requiredIndicator/><div className="flex flex-wrap gap-2 mt-3">{assignees.map(userId=>{const user=users.find(candidate=>candidate.id===userId);return user?<span className="rounded-full bg-brand-lightGray px-3 py-1 text-sm" key={userId}>{ar?user.arabicName:user.englishName}</span>:null})}</div></div>
+        <div className="mt-4"><MultiSelect label={tx('الموظفون المكلفون','Assigned employees')} options={recipientOptions} value={assignees} onChange={setAssignees} requiredIndicator disabled={editingPublished}/>{editingPublished&&<p className="mt-2 text-xs text-brand-charcoal">لا يمكن تغيير المستلمين بعد الإرسال. إذا بدأ أحدهم العمل، تُقفل تعديلات تفاصيل التكليف.</p>}<div className="flex flex-wrap gap-2 mt-3">{assignees.map(userId=>{const user=users.find(candidate=>candidate.id===userId);return user?<span className="rounded-full bg-brand-lightGray px-3 py-1 text-sm" key={userId}>{ar?user.arabicName:user.englishName}</span>:null})}</div></div>
       </Card>
 
       {error&&<p role="alert" className="p-3 border-s-4 border-brand-plum">{({title:'أدخل عنوان التكليف بالعربية.',description:'أدخل وصف التكليف بالعربية قبل الإرسال.',date:'اختر موعدًا مستقبليًا بعد تاريخ اليوم.',time:'اختر وقتاً صحيحاً للاستحقاق.',assignees:'اختر موظفًا واحدًا على الأقل.'} as Record<string,string>)[error]}</p>}
       {serverError&&<p role="alert" className="p-3 border-s-4 border-red-600">{serverError}</p>}
-      <div className="flex flex-wrap gap-3"><Button type="button" variant="outline" isLoading={busy} disabled={busy} onClick={()=>submit(false)}>{tx('حفظ كمسودة','Save draft')}</Button><Button type="button" isLoading={busy} disabled={busy} onClick={()=>submit(true)}>{tx('إرسال التكليف','Send assignment')}</Button><Button type="button" variant="ghost" onClick={()=>navigate('/app/assignments')}>{tx('إلغاء','Cancel')}</Button></div>
+      <div className="flex flex-wrap gap-3">{editingPublished ? <Button type="button" isLoading={busy} disabled={busy} onClick={()=>submit(false)}>{tx('حفظ التعديلات','Save changes')}</Button> : <><Button type="button" variant="outline" isLoading={busy} disabled={busy} onClick={()=>submit(false)}>{tx('حفظ كمسودة','Save draft')}</Button><Button type="button" isLoading={busy} disabled={busy} onClick={()=>submit(true)}>{tx('إرسال التكليف','Send assignment')}</Button></>}<Button type="button" variant="ghost" onClick={()=>navigate('/app/assignments')}>{tx('إلغاء','Cancel')}</Button></div>
     </form>
   </main>;
 };

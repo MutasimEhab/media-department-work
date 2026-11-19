@@ -90,7 +90,8 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
          LEFT JOIN assignment_assignees aa ON aa.assignment_id = a.id
          LEFT JOIN users assignee ON assignee.id = aa.user_id
          LEFT JOIN users reviewer ON reviewer.id = aa.reviewed_by
-        WHERE ($1::text = 'system_admin'
+        WHERE a.status <> 'cancelled'
+          AND ($1::text = 'system_admin'
                OR ($4::boolean AND a.department_id = $2)
                OR aa.user_id = $3)
           AND (a.status <> 'draft' OR a.created_by = $3
@@ -167,24 +168,88 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
     }
 
     let assignmentId = id;
+    let keepExistingAssignees = false;
     if (id) {
-      const updated = await client.query(
-        `UPDATE assignments
-            SET title_ar = $3, description_ar = $4, priority = $5, kind = $6, kind_flags = $7::text[],
-                status = $8, deadline = ($9::date + $10::time) AT TIME ZONE 'Asia/Gaza',
-                reference_url = $11, reminder_options = $12::jsonb,
-                notify_email = $13, notify_sms = $14, updated_at = now()
-          WHERE id = $1 AND created_by = $2 AND status = 'draft'
-          RETURNING id`,
-        [id, actor.id, title, description, priority, kind, kindFlags, draft ? 'draft' : 'active', deadline.date, deadline.time,
-          referenceUrl || null, JSON.stringify(reminderOptions), body.emailDelivery === true, body.smsDelivery === true],
+      const existingResult = await client.query<{ status: string; department_id: string; created_by: string }>(
+        'SELECT status, department_id, created_by FROM assignments WHERE id = $1 FOR UPDATE', [id],
       );
-      if (!updated.rows[0]) {
+      const existing = existingResult.rows[0];
+      const mayEdit = Boolean(existing && (actor.roleCode === 'system_admin'
+        || (actor.id === existing.created_by && actor.departmentId === existing.department_id
+          && request.permissions?.includes('manage_assignments'))));
+      if (!existing || !mayEdit) {
         await client.query('ROLLBACK');
-        response.status(404).json({ message: 'المسودة غير موجودة أو لم تعد قابلة للتعديل.' });
+        response.status(existing ? 403 : 404).json({ message: existing ? 'يمكن لمرسل التكليف أو مدير النظام تعديله فقط.' : 'التكليف غير موجود.' });
         return;
       }
-      await client.query('DELETE FROM assignment_assignees WHERE assignment_id = $1', [id]);
+
+      if (existing.status === 'active') {
+        if (draft) {
+          await client.query('ROLLBACK');
+          response.status(400).json({ message: 'لا يمكن تحويل التكليف المرسل إلى مسودة.' });
+          return;
+        }
+        const currentRecipients = await client.query<{ user_id: string; status: string }>(
+          'SELECT user_id, status FROM assignment_assignees WHERE assignment_id = $1 FOR UPDATE', [id],
+        );
+        const currentIds = currentRecipients.rows.map(row => row.user_id).sort();
+        if (JSON.stringify(currentIds) !== JSON.stringify([...assigneeIds].sort())) {
+          await client.query('ROLLBACK');
+          response.status(400).json({ message: 'لا يمكن تغيير المستلمين بعد إرسال التكليف؛ أنشئ تكليفاً جديداً لإسناده لموظفين آخرين.' });
+          return;
+        }
+        if (currentRecipients.rows.some(row => !['assigned', 'received'].includes(row.status))) {
+          await client.query('ROLLBACK');
+          response.status(409).json({ message: 'بدأ العمل على التكليف؛ لا يمكن تعديل تفاصيله الآن.' });
+          return;
+        }
+        await client.query(
+          `UPDATE assignments
+              SET title_ar = $2, description_ar = $3, priority = $4, kind = $5, kind_flags = $6::text[],
+                  deadline = ($7::date + $8::time) AT TIME ZONE 'Asia/Gaza',
+                  reference_url = $9, reminder_options = $10::jsonb,
+                  notify_email = $11, notify_sms = $12, updated_at = now()
+            WHERE id = $1`,
+          [id, title, description, priority, kind, kindFlags, deadline.date, deadline.time,
+            referenceUrl || null, JSON.stringify(reminderOptions), body.emailDelivery === true, body.smsDelivery === true],
+        );
+        for (const recipient of currentRecipients.rows) {
+          await client.query(
+            `INSERT INTO assignment_events (assignment_id, assignee_id, actor_id, event_type, payload)
+             SELECT $1, aa.id, $2, 'assignment_updated', $3::jsonb FROM assignment_assignees aa
+              WHERE aa.assignment_id = $1 AND aa.user_id = $4`,
+            [id, actor.id, JSON.stringify({ title }), recipient.user_id],
+          );
+          await client.query(
+            `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id, action_url)
+             VALUES ($1, 'TASK_ASSIGNED', 'تم تعديل التكليف', $2, 'assignment', $3, $4)`,
+            [recipient.user_id, `عدّل ${actor.fullNameAr || 'مرسل التكليف'} تفاصيل تكليف «${title}». افتح التكليف لمراجعة آخر التحديثات.`, id, `/app/assignments/${id}`],
+          );
+        }
+        keepExistingAssignees = true;
+      } else if (existing.status === 'draft') {
+        const updated = await client.query(
+          `UPDATE assignments
+              SET title_ar = $3, description_ar = $4, priority = $5, kind = $6, kind_flags = $7::text[],
+                  status = $8, deadline = ($9::date + $10::time) AT TIME ZONE 'Asia/Gaza',
+                  reference_url = $11, reminder_options = $12::jsonb,
+                  notify_email = $13, notify_sms = $14, updated_at = now()
+            WHERE id = $1 AND created_by = $2 AND status = 'draft'
+            RETURNING id`,
+          [id, actor.id, title, description, priority, kind, kindFlags, draft ? 'draft' : 'active', deadline.date, deadline.time,
+            referenceUrl || null, JSON.stringify(reminderOptions), body.emailDelivery === true, body.smsDelivery === true],
+        );
+        if (!updated.rows[0]) {
+          await client.query('ROLLBACK');
+          response.status(404).json({ message: 'المسودة غير موجودة أو لم تعد قابلة للتعديل.' });
+          return;
+        }
+        await client.query('DELETE FROM assignment_assignees WHERE assignment_id = $1', [id]);
+      } else {
+        await client.query('ROLLBACK');
+        response.status(409).json({ message: 'لا يمكن تعديل تكليف ملغى أو مكتمل.' });
+        return;
+      }
     } else {
       const created = await client.query<{ id: string }>(
         `INSERT INTO assignments (department_id, created_by, title_ar, description_ar, priority, kind, kind_flags,
@@ -197,7 +262,7 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
       assignmentId = created.rows[0]!.id;
     }
 
-    if (assigneeIds.length) {
+    if (assigneeIds.length && !keepExistingAssignees) {
       for (const userId of assigneeIds) {
         const assignee = await client.query<{ id: string }>(
           `INSERT INTO assignment_assignees (assignment_id, user_id, status)
@@ -220,7 +285,8 @@ async function saveAssignment(request: AuthenticatedRequest, response: import('e
     await client.query(
       `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
        VALUES ($1, $2, 'assignments', $3, $4::jsonb)`,
-      [actor.id, draft ? 'assignment.draft.save' : 'assignment.send', assignmentId, JSON.stringify({ recipientCount: assigneeIds.length })],
+      [actor.id, keepExistingAssignees ? 'assignment.update' : draft ? 'assignment.draft.save' : 'assignment.send', assignmentId,
+        JSON.stringify({ recipientCount: assigneeIds.length })],
     );
     const saved = await client.query(
       `SELECT a.id, a.created_by, a.title_ar, a.description_ar, a.priority, a.kind, a.kind_flags, a.status,
@@ -262,6 +328,69 @@ router.post('/', (request: AuthenticatedRequest, response) => saveAssignment(req
 router.put('/:assignmentId', (request: AuthenticatedRequest, response) => {
   const assignmentId = request.params.assignmentId;
   return saveAssignment(request, response, Array.isArray(assignmentId) ? assignmentId[0] : assignmentId);
+});
+
+router.delete('/:assignmentId', async (request: AuthenticatedRequest, response) => {
+  const actor = request.authUser!;
+  const routeId = request.params.assignmentId;
+  const assignmentId = Array.isArray(routeId) ? routeId[0] : routeId;
+  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('manage_assignments')) {
+    response.status(403).json({ message: 'لا تملك صلاحية إلغاء التكليف.' });
+    return;
+  }
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const found = await client.query<{ department_id: string; created_by: string; status: string; title_ar: string }>(
+      'SELECT department_id, created_by, status, title_ar FROM assignments WHERE id = $1 FOR UPDATE', [assignmentId],
+    );
+    const assignment = found.rows[0];
+    if (!assignment) {
+      await client.query('ROLLBACK');
+      response.status(404).json({ message: 'التكليف غير موجود.' });
+      return;
+    }
+    const allowed = actor.roleCode === 'system_admin'
+      || (actor.id === assignment.created_by && actor.departmentId === assignment.department_id);
+    if (!allowed) {
+      await client.query('ROLLBACK');
+      response.status(403).json({ message: 'يمكن لمرسل التكليف أو مدير النظام إلغاؤه فقط.' });
+      return;
+    }
+    if (assignment.status === 'completed') {
+      await client.query('ROLLBACK');
+      response.status(409).json({ message: 'لا يمكن إلغاء تكليف مكتمل.' });
+      return;
+    }
+    if (assignment.status === 'cancelled') {
+      await client.query('COMMIT');
+      response.json({ ok: true });
+      return;
+    }
+    await client.query("UPDATE assignments SET status = 'cancelled', updated_at = now() WHERE id = $1", [assignmentId]);
+    const recipients = await client.query<{ user_id: string }>(
+      'SELECT user_id FROM assignment_assignees WHERE assignment_id = $1', [assignmentId],
+    );
+    for (const recipient of recipients.rows) {
+      await client.query(
+        `INSERT INTO notifications (user_id, type, title_ar, body_ar, entity_type, entity_id, action_url)
+         VALUES ($1, 'TASK_ASSIGNED', 'تم إلغاء التكليف', $2, 'assignment', $3, '/app/assignments')`,
+        [recipient.user_id, `تم إلغاء التكليف «${assignment.title_ar}» من قبل ${actor.fullNameAr || 'الإدارة'}.`, assignmentId],
+      );
+    }
+    await client.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, 'assignment.cancel', 'assignments', $2, $3::jsonb)`,
+      [actor.id, assignmentId, JSON.stringify({ recipientCount: recipients.rows.length })],
+    );
+    await client.query('COMMIT');
+    response.json({ ok: true });
+  } catch {
+    await client.query('ROLLBACK');
+    response.status(503).json({ message: 'تعذر إلغاء التكليف حالياً.' });
+  } finally {
+    client.release();
+  }
 });
 
 router.patch('/:assignmentId/recipients/:userId', async (request: AuthenticatedRequest, response) => {

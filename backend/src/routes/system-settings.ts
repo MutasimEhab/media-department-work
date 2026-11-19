@@ -44,6 +44,8 @@ router.put('/', async (request: AuthenticatedRequest, response) => {
     && (value.assignmentTypeNames === undefined || (value.assignmentTypeNames
       && typeof value.assignmentTypeNames.normal === 'string' && value.assignmentTypeNames.normal.trim().length > 0 && value.assignmentTypeNames.normal.length <= 60
       && typeof value.assignmentTypeNames.socialMedia === 'string' && value.assignmentTypeNames.socialMedia.trim().length > 0 && value.assignmentTypeNames.socialMedia.length <= 60))
+    && (value.projectCodePrefix === undefined || (typeof value.projectCodePrefix === 'string'
+      && /^[A-Za-z\u0621-\u064A]{1,5}$/.test(value.projectCodePrefix.trim())))
     && (value.organizationLogo === undefined || value.organizationLogo === null
       || (typeof value.organizationLogo === 'string'
         && value.organizationLogo.length <= 500_000
