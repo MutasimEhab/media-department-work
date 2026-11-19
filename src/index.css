@@ -9,7 +9,7 @@
 
 .welcome-progress {
   transform-origin: right;
-  animation: welcome-progress 7s linear forwards;
+  animation: welcome-progress 3s linear forwards;
 }
 
 .welcome-backdrop {

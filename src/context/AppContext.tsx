@@ -367,7 +367,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const response = await fetch('/api/assignments', { credentials: 'include', cache: 'no-store' });
         if (!response.ok) return;
         const payload = await response.json() as { tasks?: Task[] };
-        if (!cancelled && payload.tasks) setTasks(payload.tasks);
+        if (!cancelled && payload.tasks) {
+          const incomingFingerprint = JSON.stringify(payload.tasks);
+          setTasks(previous => JSON.stringify(previous) === incomingFingerprint ? previous : payload.tasks!);
+        }
       } catch { /* Keep the most recent assignment data while offline. */ }
       finally { requestInFlight = false; }
     };

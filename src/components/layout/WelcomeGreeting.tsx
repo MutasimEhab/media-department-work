@@ -8,12 +8,14 @@ export const WelcomeGreeting: React.FC = () => {
   useEscapeKey(welcomeGreetingOpen, dismissWelcomeGreeting);
   useEffect(() => {
     if (!welcomeGreetingOpen) return;
-    const timer = window.setTimeout(dismissWelcomeGreeting, 7000);
+    const timer = window.setTimeout(dismissWelcomeGreeting, 3000);
     return () => window.clearTimeout(timer);
   }, [welcomeGreetingOpen, dismissWelcomeGreeting]);
   if (!welcomeGreetingOpen) return null;
 
-  return <div dir="rtl" className="welcome-overlay fixed inset-0 z-[100] grid place-items-center p-4 sm:p-6">
+  return <div dir="rtl" className="welcome-overlay fixed inset-0 z-[100] grid place-items-center p-4 sm:p-6" onMouseDown={event => {
+    if (event.target === event.currentTarget || (event.target instanceof HTMLElement && event.target.classList.contains('welcome-backdrop'))) dismissWelcomeGreeting();
+  }}>
     <div aria-hidden="true" className="welcome-backdrop absolute inset-0" />
     <section aria-label="رسالة ترحيب" aria-live="polite" role="status" className="welcome-greeting-panel relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/20 bg-white shadow-dialog ring-1 ring-black/10">
       <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-l from-brand-magenta via-brand-plum to-brand-magenta" />

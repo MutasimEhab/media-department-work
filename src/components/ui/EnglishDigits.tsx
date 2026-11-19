@@ -51,7 +51,9 @@ export function EnglishDigits() {
       while ((node = walker.nextNode())) {
         if (node.nodeValue && hasNonLatinDigits.test(node.nodeValue)) node.nodeValue = toEnglishDigits(node.nodeValue);
       }
-      const elements = root instanceof Element ? [root, ...Array.from(root.querySelectorAll('*'))] : [];
+      const elements = root instanceof Element
+        ? [root, ...Array.from(root.querySelectorAll('input, textarea, select, [placeholder], [title], [aria-label]'))]
+        : [];
       for (const element of elements) {
         convertControlValue(element);
         for (const attribute of ['placeholder', 'title', 'aria-label', 'value']) {
@@ -62,6 +64,18 @@ export function EnglishDigits() {
     };
 
     updateText(document.body);
+    const pendingAddedNodes: Node[] = [];
+    let updateFrame = 0;
+    const flushAddedNodes = () => {
+      updateFrame = 0;
+      const nodes = pendingAddedNodes.splice(0);
+      const roots = new Set(nodes);
+      nodes.forEach(node => {
+        let parent = node.parentNode;
+        while (parent && !roots.has(parent)) parent = parent.parentNode;
+        if (!parent) updateText(node);
+      });
+    };
     const onInput = (event: Event) => {
       if (event.target instanceof Element) convertControlValue(event.target);
     };
@@ -75,14 +89,17 @@ export function EnglishDigits() {
           const value = change.target.getAttribute(change.attributeName);
           if (value && hasNonLatinDigits.test(value)) change.target.setAttribute(change.attributeName, toEnglishDigits(value));
           if (['value', 'type', 'lang'].includes(change.attributeName)) convertControlValue(change.target);
-        } else {
-          change.addedNodes.forEach(updateText);
+        } else if (change.type === 'childList') {
+          change.addedNodes.forEach(node => pendingAddedNodes.push(node));
         }
       }
+      if (pendingAddedNodes.length && !updateFrame) updateFrame = window.requestAnimationFrame(flushAddedNodes);
     });
     observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'title', 'aria-label', 'value', 'type', 'lang'] });
     return () => {
       observer.disconnect();
+      if (updateFrame) window.cancelAnimationFrame(updateFrame);
+      pendingAddedNodes.length = 0;
       document.removeEventListener('input', onInput, true);
     };
   }, []);
