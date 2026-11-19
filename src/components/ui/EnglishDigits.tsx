@@ -20,9 +20,11 @@ export function EnglishDigits() {
       if (element instanceof HTMLInputElement) {
         const isNativeDateTime = ['date', 'time', 'month', 'datetime-local', 'week'].includes(element.type);
         if (isNativeDateTime) {
-          element.lang = 'en-US';
-          element.dir = 'ltr';
-          element.style.fontVariantNumeric = 'lining-nums';
+          // Avoid writing identical attributes: the observer below watches type/value,
+          // and repeated lang writes can otherwise enqueue another mutation forever.
+          if (element.lang !== 'en-US') element.lang = 'en-US';
+          if (element.dir !== 'ltr') element.dir = 'ltr';
+          if (element.style.fontVariantNumeric !== 'lining-nums') element.style.fontVariantNumeric = 'lining-nums';
           return;
         }
         if (isProtectedInput(element)) return;
@@ -88,14 +90,14 @@ export function EnglishDigits() {
         } else if (change.type === 'attributes' && change.target instanceof Element && change.attributeName) {
           const value = change.target.getAttribute(change.attributeName);
           if (value && hasNonLatinDigits.test(value)) change.target.setAttribute(change.attributeName, toEnglishDigits(value));
-          if (['value', 'type', 'lang'].includes(change.attributeName)) convertControlValue(change.target);
+          if (['value', 'type'].includes(change.attributeName)) convertControlValue(change.target);
         } else if (change.type === 'childList') {
           change.addedNodes.forEach(node => pendingAddedNodes.push(node));
         }
       }
       if (pendingAddedNodes.length && !updateFrame) updateFrame = window.requestAnimationFrame(flushAddedNodes);
     });
-    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'title', 'aria-label', 'value', 'type', 'lang'] });
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'title', 'aria-label', 'value', 'type'] });
     return () => {
       observer.disconnect();
       if (updateFrame) window.cancelAnimationFrame(updateFrame);
