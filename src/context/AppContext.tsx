@@ -144,6 +144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const notificationBaseline = useRef<{ userId: string; initialized: boolean; ids: Set<string> }>({ userId: '', initialized: false, ids: new Set() });
+  const notificationSnapshot = useRef<{ userId: string; fingerprint: string }>({ userId: '', fingerprint: '' });
   const dismissToast = useCallback((id: string) => setToasts(previous => previous.filter(item => item.id !== id)), []);
   const notify = useCallback((message: string, type: ToastType = 'success', action?: ToastAction) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -179,14 +180,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const acceptNotifications = useCallback((incoming: NotificationItem[]) => {
     const previous = notificationBaseline.current;
+    const fingerprint = JSON.stringify(incoming.map(item => [item.id, item.isRead, item.timestamp, item.titleAr, item.messageAr, item.actionUrl]));
     if (previous.userId !== currentUser.id || !previous.initialized) {
       notificationBaseline.current = { userId: currentUser.id, initialized: true, ids: new Set(incoming.map(item => item.id)) };
+      notificationSnapshot.current = { userId: currentUser.id, fingerprint };
       setNotifications(incoming);
       return;
     }
     const fresh = incoming.filter(item => !previous.ids.has(item.id) && !item.isRead);
     notificationBaseline.current = { userId: currentUser.id, initialized: true, ids: new Set([...previous.ids, ...incoming.map(item => item.id)]) };
-    setNotifications(incoming);
+    if (notificationSnapshot.current.userId !== currentUser.id || notificationSnapshot.current.fingerprint !== fingerprint) {
+      notificationSnapshot.current = { userId: currentUser.id, fingerprint };
+      setNotifications(incoming);
+    }
     if (fresh.length) {
       try {
         const sound = (JSON.parse(localStorage.getItem('official_system_settings') || '{}') as { notificationSound?: string }).notificationSound;
@@ -259,14 +265,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
+    let requestInFlight = false;
     const refreshNotifications = async () => {
-      if (document.visibilityState === 'hidden') return;
+      if (cancelled || requestInFlight || document.visibilityState === 'hidden') return;
+      requestInFlight = true;
       try {
         const response = await fetch('/api/notifications', { credentials: 'include', cache: 'no-store' });
         if (!response.ok) return;
         const payload = await response.json() as { notifications?: NotificationItem[] };
         if (!cancelled && payload.notifications) acceptNotifications(payload.notifications);
       } catch { /* Keep the last saved notification list while offline. */ }
+      finally { requestInFlight = false; }
     };
     void refreshNotifications();
     const interval = window.setInterval(() => void refreshNotifications(), 5_000);
@@ -330,41 +339,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isAuthenticated) return;
     let cancelled = false;
     Promise.all([
-      fetch('/api/assignments', { credentials: 'include' }),
       fetch('/api/users', { credentials: 'include' }),
       fetch('/api/projects', { credentials: 'include' }),
       fetch('/api/circulars', { credentials: 'include' }),
-      fetch('/api/notifications', { credentials: 'include' }),
-    ]).then(async ([assignmentResponse, userResponse, projectResponse, circularResponse, notificationResponse]) => {
-      const [assignmentPayload, userPayload, projectPayload, circularPayload, notificationPayload] = await Promise.all([
-        assignmentResponse.json() as Promise<{ tasks?: Task[]; message?: string }>,
+    ]).then(async ([userResponse, projectResponse, circularResponse]) => {
+      const [userPayload, projectPayload, circularPayload] = await Promise.all([
         userResponse.json() as Promise<{ users?: BackendUser[] }>,
         projectResponse.json() as Promise<{ projects?: Project[]; message?: string }>,
         circularResponse.json() as Promise<{ circulars?: Circular[] }>,
-        notificationResponse.json() as Promise<{ notifications?: NotificationItem[] }>,
       ]);
       if (cancelled) return;
-      if (assignmentResponse.ok && assignmentPayload.tasks) setTasks(assignmentPayload.tasks);
       if (userResponse.ok && userPayload.users) setUsers(userPayload.users.map(mapBackendUser));
       if (projectResponse.ok && projectPayload.projects) setProjects(projectPayload.projects);
       if (circularResponse.ok && circularPayload.circulars) setCirculars(circularPayload.circulars);
-      if (notificationResponse.ok && notificationPayload.notifications) acceptNotifications(notificationPayload.notifications);
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [isAuthenticated, currentUser.id, acceptNotifications]);
+  }, [isAuthenticated, currentUser.id]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
+    let requestInFlight = false;
     const refreshAssignments = async () => {
-      if (document.visibilityState === 'hidden') return;
+      if (cancelled || requestInFlight || document.visibilityState === 'hidden') return;
+      requestInFlight = true;
       try {
         const response = await fetch('/api/assignments', { credentials: 'include', cache: 'no-store' });
         if (!response.ok) return;
         const payload = await response.json() as { tasks?: Task[] };
         if (!cancelled && payload.tasks) setTasks(payload.tasks);
       } catch { /* Keep the most recent assignment data while offline. */ }
+      finally { requestInFlight = false; }
     };
+    void refreshAssignments();
     const interval = window.setInterval(() => void refreshAssignments(), 15_000);
     const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refreshAssignments(); };
     document.addEventListener('visibilitychange', onVisibilityChange);
