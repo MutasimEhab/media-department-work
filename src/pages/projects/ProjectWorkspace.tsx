@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -24,11 +24,38 @@ export const ProjectWorkspace: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [newOwner, setNewOwner] = useState(currentUser.role === 'EMPLOYEE' ? currentUser.id : users.find(user => user.role === 'EMPLOYEE' && user.isActive)?.id || '');
+  const [eligibleOwners, setEligibleOwners] = useState<Array<{ id: string; arabicName: string }>>([]);
+  const [ownersLoading, setOwnersLoading] = useState(false);
+  const [ownersError, setOwnersError] = useState('');
   const [linkedTask, setLinkedTask] = useState('');
   const [newStage, setNewStage] = useState('');
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState('2026-12-31');
   const manager = canAccess('manage_projects');
+  useEffect(() => {
+    if (id !== 'new') return;
+    const controller = new AbortController();
+    setOwnersLoading(true);
+    setOwnersError('');
+    fetch('/api/projects/eligible-owners', { credentials: 'include', signal: controller.signal })
+      .then(async response => {
+        const payload = await response.json() as { owners?: Array<{ id: string; arabicName: string }>; message?: string };
+        if (!response.ok) throw new Error(payload.message || 'تعذر تحميل قائمة الموظفين.');
+        return payload;
+      })
+      .then(payload => {
+        if (controller.signal.aborted) return;
+        const owners = payload.owners || [];
+        setEligibleOwners(owners);
+        setNewOwner(current => owners.some(owner => owner.id === current) ? current : owners[0]?.id || '');
+        if (!owners.length) setOwnersError('لا يوجد موظفون نشطون مرتبطون بالقسم لإسناد المشروع إليهم.');
+      })
+      .catch(cause => {
+        if (!controller.signal.aborted) setOwnersError(cause instanceof Error ? cause.message : 'تعذر تحميل قائمة الموظفين.');
+      })
+      .finally(() => { if (!controller.signal.aborted) setOwnersLoading(false); });
+    return () => controller.abort();
+  }, [id]);
   const scoped = projects.filter(project =>
     (manager || project.ownerId === currentUser.id || project.memberIds?.includes(currentUser.id)) &&
     (!owner || project.ownerId === owner) &&
@@ -59,10 +86,10 @@ export const ProjectWorkspace: React.FC = () => {
       }}>
         <TextField label={tx('اسم المشروع','Project name')} value={title} onChange={event=>setTitle(event.target.value)} dir="rtl" requiredIndicator helperText={tx('اكتب اسم المشروع بالعربية.','Enter the project name in Arabic.')}/>
         <Textarea label={tx('وصف المشروع','Project description')} value={description} onChange={event=>setDescription(event.target.value)} dir="rtl" rows={4} helperText={tx('اكتب الوصف بالعربية.','Enter the description in Arabic.')}/>
-        <label className="block text-sm">{tx('الموظف المسؤول','Project owner')}<select className="mt-1 w-full rounded-input border border-brand-border p-3" value={newOwner} onChange={event=>setNewOwner(event.target.value)} disabled={!manager}>{users.filter(user=>user.role==='EMPLOYEE'&&user.isActive).map(user=><option key={user.id} value={user.id}>{ar?user.arabicName:user.englishName}</option>)}</select></label>
+        <label className="block text-sm">{tx('الموظف المسؤول','Project owner')}<select className="mt-1 w-full rounded-input border border-brand-border p-3" value={newOwner} onChange={event=>setNewOwner(event.target.value)} disabled={ownersLoading || eligibleOwners.length === 0} required><option value="">{ownersLoading ? tx('جارٍ تحميل الموظفين…','Loading employees…') : tx('اختر الموظف المسؤول','Choose an employee')}</option>{eligibleOwners.map(user=><option key={user.id} value={user.id}>{user.arabicName}</option>)}</select>{ownersError && <span role="alert" className="mt-1 block text-sm text-red-700">{ownersError}</span>}</label>
         <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm">{tx('تاريخ البداية','Start date')}<EnglishDateInput className="mt-1" value={startDate} onChange={setStartDate} ariaLabel="تاريخ البداية" /></label><label className="text-sm">{tx('تاريخ الانتهاء المتوقع','Expected end date')}<EnglishDateInput className="mt-1" value={endDate} onChange={setEndDate} ariaLabel="تاريخ الانتهاء المتوقع" /></label></div>
         <label className="block text-sm">{tx('التكليف المرتبط','Related assignment')}<select className="mt-1 w-full rounded-input border border-brand-border p-3" value={linkedTask} onChange={event=>setLinkedTask(event.target.value)}><option value="">{tx('بدون تكليف مرتبط','No linked assignment')}</option>{tasks.filter(task=>!task.isDraft).map(task=><option key={task.id} value={task.id}>{task.id} · {ar?task.titleAr:task.titleEn}</option>)}</select></label>
-        <div className="flex gap-2"><Button type="submit">{tx('حفظ المشروع','Save project')}</Button><Button type="button" variant="outline" onClick={()=>navigate('/app/projects')}>{tx('إلغاء','Cancel')}</Button></div>
+        <div className="flex gap-2"><Button type="submit" disabled={ownersLoading || !eligibleOwners.length || !newOwner}>{tx('حفظ المشروع','Save project')}</Button><Button type="button" variant="outline" onClick={()=>navigate('/app/projects')}>{tx('إلغاء','Cancel')}</Button></div>
       </form>
     </Card>
   </main>;

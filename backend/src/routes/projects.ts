@@ -72,6 +72,26 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
   }
 });
 
+router.get('/eligible-owners', async (request: AuthenticatedRequest, response) => {
+  const actor = request.authUser!;
+  if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('manage_projects')) {
+    response.status(403).json({ message: 'لا تملك صلاحية إنشاء المشاريع.' });
+    return;
+  }
+  try {
+    const result = await db.query<{ id: string; full_name_ar: string }>(
+      `SELECT id, full_name_ar FROM users
+        WHERE role_code = 'employee' AND is_active = true AND department_id IS NOT NULL
+          AND ($1::text = 'system_admin' OR department_id = $2)
+        ORDER BY full_name_ar`,
+      [actor.roleCode, actor.departmentId],
+    );
+    response.json({ owners: result.rows.map(row => ({ id: row.id, arabicName: row.full_name_ar })) });
+  } catch {
+    response.status(503).json({ message: 'تعذر تحميل الموظفين المسؤولين عن المشاريع.' });
+  }
+});
+
 router.post('/', async (request: AuthenticatedRequest, response) => {
   const actor = request.authUser!;
   if (actor.roleCode !== 'system_admin' && !request.permissions?.includes('manage_projects')) {
