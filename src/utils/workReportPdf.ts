@@ -44,16 +44,28 @@ async function footerWave(): Promise<string> {
   return canvas.toDataURL('image/png');
 }
 
+function parseReportDate(value: string): Date | undefined {
+  if (typeof value !== 'string') return undefined;
+  const isoDate = value.trim().match(/^(\d{4}-\d{2}-\d{2})$/)?.[1];
+  if (!isoDate) return undefined;
+  const date = new Date(`${isoDate}T12:00:00Z`);
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== isoDate ? undefined : date;
+}
+
 function formatArabicDate(value: string, options: Intl.DateTimeFormatOptions): string {
+  const date = parseReportDate(value);
+  if (!date) return '—';
   return new Intl.DateTimeFormat('ar-PS', {
     ...options, timeZone: 'UTC', calendar: 'gregory', numberingSystem: 'latn',
-  }).format(new Date(`${value}T12:00:00Z`));
+  }).format(date);
 }
 
 function numericDate(value: string): string {
+  const date = parseReportDate(value);
+  if (!date) return '—';
   return new Intl.DateTimeFormat('en-GB', {
     day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC',
-  }).format(new Date(`${value}T12:00:00Z`));
+  }).format(date);
 }
 
 export async function downloadWorkReportPdf(

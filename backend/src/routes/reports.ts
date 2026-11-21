@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/require-auth.js';
+import { dateOnly } from '../utils/date.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -38,7 +39,7 @@ router.get('/monthly', async (request: AuthenticatedRequest, response) => {
     }
 
     const logs = await db.query<{
-      id: string; user_id: string; full_name_ar: string; work_date: string; created_at: Date;
+      id: string; user_id: string; full_name_ar: string; work_date: string | Date; created_at: Date;
       work_mode: string; work_region: string; description_ar: string;
     }>(
       `SELECT l.id, l.user_id, u.full_name_ar, l.work_date, l.created_at,
@@ -67,7 +68,7 @@ router.get('/monthly', async (request: AuthenticatedRequest, response) => {
       id: row.id,
       userId: row.user_id,
       userNameAr: row.full_name_ar,
-      date: String(row.work_date).slice(0, 10),
+      date: dateOnly(row.work_date),
       time: new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Gaza', hour: '2-digit', minute: '2-digit', hour12: true }).format(row.created_at),
       activityAr: row.description_ar,
       location: row.work_mode === 'field' ? 'FIELD' : 'OFFICE',

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/require-auth.js';
+import { dateOnly } from '../utils/date.js';
 
 const router = Router();
 const MANAGE_PERMISSION = 'manage_work_exceptions';
@@ -67,7 +68,7 @@ router.get('/', async (request: AuthenticatedRequest, response) => {
       exceptions: result.rows.map((row) => ({
         id: row.id,
         userId: row.user_id,
-        dates: [String(row.work_date).slice(0, 10)],
+        dates: [dateOnly(row.work_date)],
         grantedBy: row.granted_by,
         createdAt: row.created_at,
         reason: row.reason_ar,

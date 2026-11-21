@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/require-auth.js';
+import { dateOnly } from '../utils/date.js';
 
 const router = Router();
 const areaToRegion: Record<string, 'north_gaza' | 'south_gaza'> = {
@@ -27,7 +28,7 @@ function validDate(value: unknown): value is string {
 }
 
 function mapWorkLog(row: Record<string, any>) {
-  const date = String(row.work_date).slice(0, 10);
+  const date = dateOnly(row.work_date);
   const time = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Gaza', hour: '2-digit', minute: '2-digit', hour12: true,
   }).format(new Date(row.created_at));
@@ -239,7 +240,7 @@ router.patch('/:logId', async (request: AuthenticatedRequest, response) => {
     await client.query(
       `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
        VALUES ($1, 'work_log.update', 'work_logs', $2, $3::jsonb)`,
-      [actor.id, row.id, JSON.stringify({ workDate: String(row.work_date).slice(0, 10) })],
+      [actor.id, row.id, JSON.stringify({ workDate: dateOnly(row.work_date) })],
     );
     await client.query('COMMIT');
     response.json({ workLog: mapWorkLog({ ...row, full_name_ar: actor.fullNameAr }) });
@@ -274,7 +275,7 @@ router.delete('/:logId', async (request: AuthenticatedRequest, response) => {
     await client.query(
       `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
        VALUES ($1, 'work_log.delete', 'work_logs', $2, $3::jsonb)`,
-      [actor.id, row.id, JSON.stringify({ workDate: String(row.work_date).slice(0, 10), permanentlyDeleted: true })],
+      [actor.id, row.id, JSON.stringify({ workDate: dateOnly(row.work_date), permanentlyDeleted: true })],
     );
     await client.query('COMMIT');
     response.json({ workLogId: row.id, deleted: true });

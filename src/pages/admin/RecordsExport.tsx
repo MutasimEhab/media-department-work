@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { WorkLog } from '../../types';
 import { EnglishDateInput } from '../../components/ui/EnglishDateInput';
 import { downloadWorkReportPdf, ReportEmployee } from '../../utils/workReportPdf';
+import { formatArabicWorkDate } from '../../utils/dateFormatting';
 
 export const RecordsExport: React.FC = () => {
   const { canAccess } = useApp();
@@ -68,11 +69,6 @@ export const RecordsExport: React.FC = () => {
     }
   };
 
-  const arabicDate = (value: string) => new Intl.DateTimeFormat('ar-PS', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    timeZone: 'UTC', calendar: 'gregory', numberingSystem: 'latn',
-  }).format(new Date(`${value}T12:00:00Z`));
-
   return <main className="space-y-5 printable-report">
     <header className="app-page-heading"><h1 className="mt-2 text-2xl font-bold">الكشوفات والتصدير</h1><p>تصفية سجلات العمل المحفوظة ثم تنزيل كشف PDF مباشر بالترويسة الرسمية.</p></header>
     {loadError && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">{loadError}</p>}
@@ -85,6 +81,6 @@ export const RecordsExport: React.FC = () => {
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2"><span className="me-auto text-sm">أعمال مطابقة: {rows.length}</span><Button variant="outline" onClick={() => { setFrom(''); setTo(''); setQuery(''); setEmployeeId(''); }}>مسح الفلاتر</Button><Button disabled={loading || !!loadError} onClick={exportCsv}>تصدير Excel / CSV</Button><Button variant="outline" disabled={loading || pdfBusy || !!loadError || !rows.length} isLoading={pdfBusy} onClick={() => void exportPdf()}>تنزيل PDF بالترويسة</Button></div>
     </Card>
-    <Card title="نتائج الكشف"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-brand-magenta text-white"><tr><th className="p-3">#</th><th className="p-3">الموظف</th><th className="p-3">التاريخ</th><th className="p-3">طبيعة العمل</th><th className="p-3">التفاصيل</th><th className="p-3">المنطقة</th></tr></thead><tbody>{loading ? <tr><td colSpan={6} className="p-5 text-center">جارٍ تحميل السجلات…</td></tr> : rows.length ? rows.map((row, index) => <tr key={row.id} className="border-t border-brand-border"><td className="p-3 text-center" dir="ltr">{index + 1}</td><td className="p-3">{row.userNameAr}</td><td className="p-3">{arabicDate(row.date)}</td><td className="p-3">{row.location === 'OFFICE' ? 'مكتبي' : 'ميداني'}</td><td className="max-w-sm p-3">{row.activityAr}</td><td className="p-3">{row.area || '—'}</td></tr>) : <tr><td colSpan={6} className="p-5 text-center">لا توجد سجلات مطابقة.</td></tr>}</tbody></table></div></Card>
+    <Card title="نتائج الكشف"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-brand-magenta text-white"><tr><th className="p-3">#</th><th className="p-3">الموظف</th><th className="p-3">التاريخ</th><th className="p-3">طبيعة العمل</th><th className="p-3">التفاصيل</th><th className="p-3">المنطقة</th></tr></thead><tbody>{loading ? <tr><td colSpan={6} className="p-5 text-center">جارٍ تحميل السجلات…</td></tr> : rows.length ? rows.map((row, index) => <tr key={row.id} className="border-t border-brand-border"><td className="p-3 text-center" dir="ltr">{index + 1}</td><td className="p-3">{row.userNameAr}</td><td className="p-3">{formatArabicWorkDate(row.date)}</td><td className="p-3">{row.location === 'OFFICE' ? 'مكتبي' : 'ميداني'}</td><td className="max-w-sm p-3">{row.activityAr}</td><td className="p-3">{row.area || '—'}</td></tr>) : <tr><td colSpan={6} className="p-5 text-center">لا توجد سجلات مطابقة.</td></tr>}</tbody></table></div></Card>
   </main>;
 };
