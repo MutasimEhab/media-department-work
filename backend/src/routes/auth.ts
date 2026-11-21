@@ -8,6 +8,8 @@ const SESSION_COOKIE = 'media_dept_session';
 const SESSION_LIFETIME_MS = 12 * 60 * 60 * 1000;
 const DEFAULT_IDLE_TIMEOUT_MINUTES = 30;
 const BCRYPT_ROUNDS = 12;
+const PASSWORD_RESET_LIFETIME_MINUTES = 30;
+const PASSWORD_RESET_GENERIC_MESSAGE = 'إذا كان البريد مرتبطاً بحساب نشط، فستصلك رسالة فيها رابط آمن لإعادة تعيين كلمة المرور.';
 
 type RoleCode = 'system_admin' | 'department_manager' | 'deputy_manager' | 'employee';
 
@@ -242,6 +244,165 @@ export async function getEffectivePermissions(userId: string, accountTypeCode: s
   );
   return result.rows.map((row) => row.code);
 }
+
+async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const sender = process.env.RESEND_FROM_EMAIL;
+  const appUrl = process.env.APP_URL;
+  if (!apiKey || !sender || !appUrl) throw new Error('PASSWORD_RESET_EMAIL_NOT_CONFIGURED');
+
+  const baseUrl = new URL(appUrl);
+  if (baseUrl.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(baseUrl.hostname)) {
+    throw new Error('PASSWORD_RESET_APP_URL_MUST_USE_HTTPS');
+  }
+  const resetUrl = new URL('/auth/reset-password', baseUrl);
+  resetUrl.searchParams.set('token', token);
+  const link = resetUrl.toString();
+  const html = `<div dir="rtl" lang="ar" style="font-family:Arial,sans-serif;line-height:1.8"><h2>إعادة تعيين كلمة المرور</h2><p>وصلنا طلب لإعادة تعيين كلمة المرور لحسابك في نظام أعمال قسم الإعلام.</p><p><a href="${link}" style="display:inline-block;background:#b0008e;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none">إنشاء كلمة مرور جديدة</a></p><p>ينتهي الرابط خلال ${PASSWORD_RESET_LIFETIME_MINUTES} دقيقة، ويُستخدم مرة واحدة فقط.</p><p>إذا لم تطلب إعادة التعيين، تجاهل هذه الرسالة.</p></div>`;
+  const result = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'media-department-work/1.0',
+    },
+    body: JSON.stringify({
+      from: sender,
+      to: [email],
+      subject: 'إعادة تعيين كلمة المرور',
+      html,
+      text: `لإعادة تعيين كلمة المرور افتح الرابط التالي خلال ${PASSWORD_RESET_LIFETIME_MINUTES} دقيقة: ${link}\nإذا لم تطلب ذلك، تجاهل الرسالة.`,
+    }),
+  });
+  if (!result.ok) throw new Error('PASSWORD_RESET_EMAIL_DELIVERY_FAILED');
+}
+
+router.post('/forgot-password', async (request, response) => {
+  const genericResponse = () => response.json({ message: PASSWORD_RESET_GENERIC_MESSAGE });
+  const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    genericResponse();
+    return;
+  }
+
+  // Return the same configuration response regardless of whether an account exists.
+  if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL || !process.env.APP_URL) {
+    response.status(503).json({ message: 'خدمة استعادة كلمة المرور غير مهيأة بعد. تواصل مع مدير النظام.' });
+    return;
+  }
+
+  try {
+    const user = await findUser(email);
+    if (!user || !user.is_active) {
+      genericResponse();
+      return;
+    }
+
+    const recent = await db.query(
+      `SELECT 1 FROM password_reset_tokens
+        WHERE user_id = $1 AND used_at IS NULL AND created_at > now() - interval '1 minute'
+        LIMIT 1`, [user.id],
+    );
+    if (recent.rows.length) {
+      genericResponse();
+      return;
+    }
+
+    const token = randomBytes(32).toString('base64url');
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        'UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND used_at IS NULL', [user.id],
+      );
+      await client.query(
+        `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+         VALUES ($1, $2, now() + ($3::integer * interval '1 minute'))`,
+        [user.id, hashValue(token), PASSWORD_RESET_LIFETIME_MINUTES],
+      );
+      await client.query('DELETE FROM password_reset_tokens WHERE expires_at < now() - interval \'1 day\'');
+      await client.query('COMMIT');
+    } catch {
+      await client.query('ROLLBACK');
+      throw new Error('PASSWORD_RESET_TOKEN_SAVE_FAILED');
+    } finally {
+      client.release();
+    }
+
+    try {
+      await sendPasswordResetEmail(user.email, token);
+      genericResponse();
+    } catch {
+      await db.query(
+        'UPDATE password_reset_tokens SET used_at = now() WHERE token_hash = $1 AND used_at IS NULL',
+        [hashValue(token)],
+      );
+      // Keep responses indistinguishable for known and unknown accounts.
+      genericResponse();
+    }
+  } catch {
+    response.status(503).json({ message: 'تعذر معالجة طلب الاستعادة حالياً. أعد المحاولة بعد قليل.' });
+  }
+});
+
+router.post('/reset-password', async (request, response) => {
+  const token = typeof request.body?.token === 'string' ? request.body.token : '';
+  const newPassword = typeof request.body?.newPassword === 'string' ? request.body.newPassword : '';
+  if (!/^[A-Za-z0-9_-]{40,60}$/.test(token) || newPassword.length < 9 || Buffer.byteLength(newPassword, 'utf8') > 72) {
+    response.status(400).json({ message: 'رابط الاستعادة غير صالح أو انتهت صلاحيته، أو أن كلمة المرور لا تحقق الشروط.' });
+    return;
+  }
+
+  const tokenHash = hashValue(token);
+  const validToken = await db.query(
+    'SELECT 1 FROM password_reset_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()',
+    [tokenHash],
+  );
+  if (!validToken.rows[0]) {
+    response.status(400).json({ message: 'رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً.' });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const tokenResult = await client.query<{ id: string; user_id: string }>(
+      `SELECT id, user_id FROM password_reset_tokens
+        WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+        FOR UPDATE`, [tokenHash],
+    );
+    const reset = tokenResult.rows[0];
+    if (!reset) {
+      await client.query('ROLLBACK');
+      response.status(400).json({ message: 'رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً.' });
+      return;
+    }
+
+    const updated = await client.query(
+      'UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1 AND is_active = true RETURNING id',
+      [reset.user_id, passwordHash],
+    );
+    if (!updated.rows[0]) {
+      await client.query('ROLLBACK');
+      response.status(400).json({ message: 'تعذر تغيير كلمة المرور لهذا الحساب. تواصل مع مدير النظام.' });
+      return;
+    }
+    await client.query('UPDATE password_reset_tokens SET used_at = now() WHERE id = $1', [reset.id]);
+    await client.query('UPDATE login_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [reset.user_id]);
+    await client.query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+       VALUES ($1, 'user.password.reset', 'users', $1, '{}'::jsonb)`, [reset.user_id],
+    );
+    await client.query('COMMIT');
+    response.json({ message: 'تم تغيير كلمة المرور. سجّل الدخول باستخدام كلمة المرور الجديدة.' });
+  } catch {
+    await client.query('ROLLBACK');
+    response.status(503).json({ message: 'تعذر حفظ كلمة المرور حالياً. أعد المحاولة.' });
+  } finally {
+    client.release();
+  }
+});
 
 router.post('/login', async (request, response) => {
   const identifier = typeof request.body?.identifier === 'string'

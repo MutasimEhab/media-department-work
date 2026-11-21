@@ -296,7 +296,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       finally { requestInFlight = false; }
     };
     void refreshNotifications();
-    const interval = window.setInterval(() => void refreshNotifications(), 5_000);
+    const interval = window.setInterval(() => void refreshNotifications(), 30_000);
     const onFocus = () => void refreshNotifications();
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);
@@ -393,7 +393,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       finally { requestInFlight = false; }
     };
     void refreshAssignments();
-    const interval = window.setInterval(() => void refreshAssignments(), 15_000);
+    const interval = window.setInterval(() => void refreshAssignments(), 60_000);
     const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refreshAssignments(); };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {

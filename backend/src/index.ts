@@ -19,6 +19,7 @@ import accountTypesRouter from './routes/account-types.js';
 import auditLogsRouter from './routes/audit-logs.js';
 import systemHealthRouter from './routes/system-health.js';
 import reportsRouter from './routes/reports.js';
+import adminToolsRouter from './routes/admin-tools.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -50,6 +51,7 @@ app.use('/api/account-types', accountTypesRouter);
 app.use('/api/audit-logs', auditLogsRouter);
 app.use('/api/system-health', systemHealthRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/admin-tools', adminToolsRouter);
 
 app.get('/api/health', async (_request, response) => {
   try {

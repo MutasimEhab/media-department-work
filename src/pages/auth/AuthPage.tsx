@@ -12,9 +12,13 @@ export const AuthPage: React.FC = () => {
   const mode = location.pathname.endsWith('forgot-password') ? 'forgot' : location.pathname.endsWith('reset-password') ? 'reset' : 'login';
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const resetToken = new URLSearchParams(location.search).get('token') || '';
 
   useEffect(() => {
     if (!isAuthLoading && isAuthenticated) {
@@ -34,10 +38,45 @@ export const AuthPage: React.FC = () => {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
-    if (mode !== 'login') {
-      setError('استعادة كلمة المرور تحتاج ربط البريد الإلكتروني بالنظام أولاً.');
+    setNotice('');
+    if (mode === 'forgot') {
+      if (!identifier.trim()) { setError('أدخل البريد الإلكتروني المرتبط بحسابك.'); return; }
+      setBusy(true);
+      try {
+        const response = await fetch('/api/auth/forgot-password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: identifier.trim() }),
+        });
+        const payload = await response.json() as { message?: string };
+        if (!response.ok) throw new Error(payload.message || 'تعذر إرسال رسالة الاستعادة حالياً.');
+        setNotice(payload.message || 'إذا كان البريد مرتبطاً بحساب نشط، فستصلك رسالة فيها رابط آمن لإعادة تعيين كلمة المرور.');
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+      } finally { setBusy(false); }
       return;
     }
+
+    if (mode === 'reset') {
+      if (!resetToken) { setError('رابط الاستعادة غير مكتمل. اطلب رابطاً جديداً.'); return; }
+      if (newPassword.length < 9) { setError('اجعل كلمة المرور 9 أحرف أو أرقام على الأقل.'); return; }
+      if (newPassword !== confirmPassword) { setError('كلمتا المرور غير متطابقتين.'); return; }
+      setBusy(true);
+      try {
+        const response = await fetch('/api/auth/reset-password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: resetToken, newPassword }),
+        });
+        const payload = await response.json() as { message?: string };
+        if (!response.ok) throw new Error(payload.message || 'تعذر تغيير كلمة المرور.');
+        setNotice(payload.message || 'تم تغيير كلمة المرور. سجّل الدخول باستخدام كلمة المرور الجديدة.');
+        setNewPassword('');
+        setConfirmPassword('');
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بالخادم.');
+      } finally { setBusy(false); }
+      return;
+    }
+
     if (!identifier.trim() || !password) {
       setError('required');
       return;
@@ -105,13 +144,27 @@ export const AuthPage: React.FC = () => {
               </Button>
               <Link className="block underline text-brand-plum text-sm" to="/auth/forgot-password">نسيت كلمة المرور؟</Link>
             </form>
+          ) : mode === 'forgot' ? (
+            <form noValidate onSubmit={submit} className="space-y-5">
+              <p className="text-sm leading-7">أدخل البريد الإلكتروني المسجل في حسابك. إذا كان مرتبطاً بحساب نشط، سنرسل إليه رابط استعادة صالحاً لمدة 30 دقيقة.</p>
+              <TextField label="البريد الإلكتروني" type="email" autoComplete="email" dir="ltr" value={identifier} onChange={event => { setIdentifier(event.target.value); setError(''); setNotice(''); }} required />
+              {error && <p role="alert" className="border-s-4 border-brand-plum ps-3 text-sm">{error}</p>}
+              {notice && <p role="status" className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800">{notice}</p>}
+              <Button type="submit" fullWidth isLoading={busy} disabled={busy}>{busy ? 'جارٍ إرسال الطلب…' : 'إرسال رابط الاستعادة'}</Button>
+              <Link className="block underline text-brand-plum text-sm" to="/auth/login">العودة لتسجيل الدخول</Link>
+            </form>
           ) : (
-            <div role="status" className="space-y-4 text-sm leading-7">
-              <p>استعادة كلمة المرور عبر البريد الإلكتروني لم تُفعّل بعد.</p>
-              <Link className="block underline text-brand-plum" to="/auth/login">العودة لتسجيل الدخول</Link>
-            </div>
+            <form noValidate onSubmit={submit} className="space-y-5">
+              {!resetToken && <p role="alert" className="border-s-4 border-brand-plum ps-3 text-sm">رابط الاستعادة غير مكتمل. اطلب رابطاً جديداً.</p>}
+              <TextField label="كلمة المرور الجديدة" type="password" autoComplete="new-password" dir="ltr" value={newPassword} onChange={event => { setNewPassword(event.target.value); setError(''); setNotice(''); }} required />
+              <TextField label="تأكيد كلمة المرور الجديدة" type="password" autoComplete="new-password" dir="ltr" value={confirmPassword} onChange={event => { setConfirmPassword(event.target.value); setError(''); setNotice(''); }} required />
+              <p className="text-xs">يجب أن تتكون كلمة المرور من 9 أحرف أو أرقام على الأقل.</p>
+              {error && <p role="alert" className="border-s-4 border-brand-plum ps-3 text-sm">{error}</p>}
+              {notice && <p role="status" className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800">{notice}</p>}
+              {notice ? <Link className="block underline text-brand-plum text-sm" to="/auth/login">العودة لتسجيل الدخول</Link> : <Button type="submit" fullWidth isLoading={busy} disabled={busy || !resetToken}>{busy ? 'جارٍ تغيير كلمة المرور…' : 'تغيير كلمة المرور'}</Button>}
+            </form>
           )}
-          <p className="text-xs leading-6">تنتهي الجلسة بعد 30 دقيقة من عدم النشاط، ولا تُحفظ كلمة المرور في المتصفح.</p>
+          {mode === 'login' && <p className="text-xs leading-6">تنتهي الجلسة بعد 30 دقيقة من عدم النشاط، ولا تُحفظ كلمة المرور في المتصفح.</p>}
         </section>
       </div>
     </main>
