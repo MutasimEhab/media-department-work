@@ -20,6 +20,8 @@ interface AppContextType {
   login: (identifier: string, password: string) => Promise<{ ok: boolean; code?: string; user?: User }>;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
+  authCheckError: string | null;
+  retryAuthCheck: () => void;
   welcomeGreetingOpen: boolean;
   dismissWelcomeGreeting: () => void;
   notify: (message: string, type?: ToastType, action?: ToastAction) => void;
@@ -129,6 +131,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authCheckError, setAuthCheckError] = useState<string | null>(null);
+  const [authCheckAttempt, setAuthCheckAttempt] = useState(0);
+  const retryAuthCheck = useCallback(() => {
+    setAuthCheckError(null);
+    setIsAuthLoading(true);
+    setAuthCheckAttempt(attempt => attempt + 1);
+  }, []);
   const [welcomeGreetingOpen, setWelcomeGreetingOpen] = useState(false);
   const getGazaDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Gaza', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const [today, setToday] = useState(getGazaDate);
@@ -211,21 +220,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/auth/me', { credentials: 'include' })
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
+    fetch('/api/auth/me', { credentials: 'include', signal: controller.signal })
       .then(async response => {
-        if (!response.ok) return null;
+        if (!response.ok) throw new Error('AUTH_CHECK_FAILED');
         return await response.json() as { user?: BackendUser };
       })
       .then(payload => {
         if (cancelled || !payload?.user) return;
+        setAuthCheckError(null);
         setCurrentUser(mapBackendUser(payload.user));
         setIsAuthenticated(true);
         setWelcomeGreetingOpen(true);
       })
-      .catch(() => undefined)
-      .finally(() => { if (!cancelled) setIsAuthLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
+      .catch(() => {
+        if (!cancelled) setAuthCheckError('تعذر التحقق من جلسة الدخول. افحص اتصال الإنترنت ثم أعد المحاولة.');
+      })
+      .finally(() => {
+        window.clearTimeout(timeout);
+        if (!cancelled) setIsAuthLoading(false);
+      });
+    return () => { cancelled = true; window.clearTimeout(timeout); controller.abort(); };
+  }, [authCheckAttempt]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -856,6 +873,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         login,
         isAuthenticated,
         isAuthLoading,
+        authCheckError,
+        retryAuthCheck,
         welcomeGreetingOpen,
         dismissWelcomeGreeting,
         notify,

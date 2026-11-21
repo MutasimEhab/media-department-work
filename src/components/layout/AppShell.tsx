@@ -8,7 +8,7 @@ import { WelcomeGreeting } from './WelcomeGreeting';
 import { Toast } from '../ui/Toast';
 
 export const AppShell: React.FC = () => {
-  const { isAuthenticated, isAuthLoading, theme, toasts, dismissToast, institutionLogo, markNotificationAsRead } = useApp();
+  const { isAuthenticated, isAuthLoading, authCheckError, retryAuthCheck, theme, toasts, dismissToast, institutionLogo, markNotificationAsRead } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   React.useEffect(() => {
@@ -34,6 +34,7 @@ export const AppShell: React.FC = () => {
     favicon.href = institutionLogo;
   }, [institutionLogo]);
   if (isAuthLoading) return <main role="status" className="min-h-screen grid place-items-center bg-brand-lightGray text-brand-charcoal">جارٍ التحقق من جلسة الدخول…</main>;
+  if (authCheckError) return <main className="min-h-screen grid place-items-center bg-brand-lightGray p-4 text-brand-charcoal"><section role="alert" className="w-full max-w-md rounded-2xl border border-brand-border bg-white p-6 text-center shadow-lg"><h1 className="text-xl font-bold">تعذر تحميل الصفحة</h1><p className="mt-3 text-sm">{authCheckError}</p><button type="button" onClick={retryAuthCheck} className="mt-5 rounded-lg bg-brand-magenta px-5 py-3 font-semibold text-white hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-brand-magenta focus:ring-offset-2">إعادة المحاولة</button></section></main>;
   if (!isAuthenticated) return <Navigate to="/auth/login" replace state={{ from: location.pathname }} />;
   return (
     <div className={`${theme === 'dark' ? 'app-theme-dark' : 'app-theme-light'} min-h-screen bg-brand-lightGray text-brand-darkText flex flex-col`}>
