@@ -102,7 +102,7 @@
 
 body {
   margin: 0;
-  font-family: 'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Tajawal', 'Janna LT', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Janna LT', 'Segoe UI', system-ui, -apple-system, sans-serif;
   background-color: var(--color-light-gray);
   color: var(--color-dark-text);
   -webkit-font-smoothing: antialiased;
@@ -147,7 +147,7 @@ body {
 }
 
 h1, h2, h3 {
-  font-family: 'Tajawal', 'Janna LT', sans-serif;
+  font-family: 'Janna LT', 'Segoe UI', sans-serif;
   font-weight: 800;
   text-wrap: balance;
 }
@@ -491,6 +491,32 @@ html.app-theme-dark ::-webkit-scrollbar-thumb:hover { background: #777d8b; }
   .auth-page > div { min-height: unset; border-radius: 20px; }
   .auth-page > div > section:first-child { grid-column: 1; grid-row: 1; }
   .auth-page > div > section:last-child { grid-column: 1; grid-row: 2; }
+}
+
+@media (max-width: 640px) {
+  .auth-page > div > section:first-child {
+    gap: .25rem;
+    padding: 16px 20px;
+  }
+  .auth-page > div > section:first-child > :not([hidden]) ~ :not([hidden]) { margin-top: 0; }
+  .auth-page > div > section:first-child .auth-system-title {
+    margin: 0 0 4px;
+    padding: 5px 12px;
+    font-size: .75rem;
+  }
+  .auth-page > div > section:first-child h1 {
+    margin: 0;
+    font-size: 1.55rem;
+    line-height: 1.3;
+  }
+  .auth-page > div > section:first-child > p:not(.auth-system-title):not(.auth-security) {
+    margin: 0;
+    font-size: .875rem;
+    line-height: 1.5;
+  }
+  .auth-page .auth-benefits,
+  .auth-page .auth-security { display: none; }
+  .auth-page > div > section:last-child { padding: 22px; }
 }
 
 @media print {

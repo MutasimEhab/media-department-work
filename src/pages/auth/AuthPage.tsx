@@ -101,12 +101,12 @@ export const AuthPage: React.FC = () => {
           <p className="auth-system-title">نظام إدارة أعمال قسم الإعلام</p>
           <h1 className="text-3xl sm:text-4xl font-bold leading-relaxed">أعمال قسم الإعلام</h1>
           <p className="leading-8">نظام تسجيل ومتابعة أعمال موظفي قسم الإعلام.</p>
-          <div className="space-y-2 text-sm">
+          <div className="auth-benefits space-y-2 text-sm">
             {['تسجيل أعمال الموظفين اليومية', 'متابعة التكليفات والمشاريع', 'إدارة التعاميم والإشعارات'].map(item => (
               <p key={item} className="rounded-xl border border-white/25 bg-white/10 px-4 py-3">{item}</p>
             ))}
           </div>
-          <p className="flex gap-3 text-sm items-start"><ShieldCheck className="shrink-0" />تسجيل الدخول يتحقق من الحساب وكلمة المرور عبر الخادم.</p>
+          <p className="auth-security flex gap-3 text-sm items-start"><ShieldCheck className="shrink-0" />تسجيل الدخول يتحقق من الحساب وكلمة المرور عبر الخادم.</p>
         </section>
 
         <section className="border border-brand-charcoal/30 rounded-2xl p-5 sm:p-8 min-w-0 space-y-6" aria-labelledby="auth-title">
